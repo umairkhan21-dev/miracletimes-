@@ -93,6 +93,13 @@
         text-align: right;
       }
 
+      .mark {
+        height: 44px;
+        width: auto;
+        display: block;
+        justify-self: start;
+      }
+
       .status {
         display: inline-flex;
         align-items: center;
@@ -232,6 +239,10 @@
         .status {
           letter-spacing: 0.12em;
         }
+
+        .mark {
+          height: 34px;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -247,7 +258,7 @@
     <div class="grain" aria-hidden="true"></div>
     <div class="page">
       <header>
-        <span>Vol. 01</span>
+        <img class="mark" src="mark.png" alt="Miracle Times" />
         <span class="status"><i class="dot" aria-hidden="true"></i> Preparing</span>
         <span>2026</span>
       </header>
