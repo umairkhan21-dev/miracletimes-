@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Miracle News — Coming Soon</title>
+    <title>Miracle Times — Coming Soon</title>
     <meta
       name="description"
-      content="Miracle News is on the way. The first edition is being prepared."
+      content="Miracle Times is on the way. Voice of the people for the people."
     />
     <meta name="theme-color" content="#100e0c" />
-    <meta property="og:title" content="Miracle News — Coming Soon" />
+    <meta property="og:title" content="Miracle Times — Coming Soon" />
     <meta
       property="og:description"
-      content="Miracle News is on the way. The first edition is being prepared."
+      content="Miracle Times is on the way. Voice of the people for the people."
     />
     <meta property="og:type" content="website" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23100e0c'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Georgia,serif' font-size='16' fill='%23f4efe6'%3EM%3C/text%3E%3C/svg%3E" />
@@ -28,8 +28,8 @@
         --fg: #f4efe6;
         --muted: #a89f93;
         --line: rgba(244, 239, 230, 0.16);
-        --accent: #e24b38;
-        --glow: rgba(226, 75, 56, 0.18);
+        --accent: #dc2e21;
+        --glow: rgba(220, 46, 33, 0.2);
       }
 
       * {
@@ -105,7 +105,7 @@
         height: 7px;
         border-radius: 50%;
         background: var(--accent);
-        box-shadow: 0 0 0 0 rgba(226, 75, 56, 0.6);
+        box-shadow: 0 0 0 0 rgba(220, 46, 33, 0.6);
         animation: pulse 2.2s ease-out infinite;
       }
 
@@ -119,33 +119,21 @@
         padding: 48px 0;
       }
 
-      .kicker {
-        margin-bottom: 22px;
-        font-size: 13px;
-        letter-spacing: 0.38em;
-        text-transform: uppercase;
-        color: var(--muted);
-        animation: rise 0.8s ease both;
-      }
-
       h1 {
-        font-family: "Fraunces", Georgia, serif;
-        font-weight: 560;
-        font-size: clamp(4.2rem, 13vw, 9.5rem);
-        line-height: 0.86;
-        letter-spacing: -0.035em;
+        margin: 0;
         animation: rise 0.9s 0.08s ease both;
       }
 
-      h1 em {
+      .logo {
+        width: min(460px, 82vw);
+        height: auto;
         display: block;
-        font-style: italic;
-        font-weight: 500;
+        background: #fff;
       }
 
       .rules {
         width: min(280px, 60vw);
-        margin: 28px 0 22px;
+        margin: 26px 0 22px;
         animation: rise 0.9s 0.16s ease both;
       }
 
@@ -207,13 +195,13 @@
 
       @keyframes pulse {
         0% {
-          box-shadow: 0 0 0 0 rgba(226, 75, 56, 0.55);
+          box-shadow: 0 0 0 0 rgba(220, 46, 33, 0.55);
         }
         70% {
-          box-shadow: 0 0 0 8px rgba(226, 75, 56, 0);
+          box-shadow: 0 0 0 8px rgba(220, 46, 33, 0);
         }
         100% {
-          box-shadow: 0 0 0 0 rgba(226, 75, 56, 0);
+          box-shadow: 0 0 0 0 rgba(220, 46, 33, 0);
         }
       }
 
@@ -253,10 +241,12 @@
       </header>
 
       <main>
-        <p class="kicker">A new publication</p>
         <h1>
-          Miracle
-          <em>News</em>
+          <img
+            class="logo"
+            src="logo.png"
+            alt="Miracle Times. Voice of the people for the people."
+          />
         </h1>
         <div class="rules" aria-hidden="true">
           <span></span>
@@ -268,7 +258,7 @@
 
       <footer>
         <span>First edition</span>
-        <span>Miracle News</span>
+        <span>Miracle Times</span>
         <span>On the way</span>
       </footer>
     </div>
