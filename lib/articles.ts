@@ -11,9 +11,9 @@ function article(
 }
 
 /**
- * Frontend demo dataset. Every record is invented sample copy for the
- * Miracle Times interface. Do not present these stories as verified news.
- * A future backend can replace this module without changing page components.
+ * Legacy in-memory demo dataset (unused by the live UI).
+ * Public pages now load published content from the Express API via `lib/api.ts`.
+ * Kept for reference / offline fixtures only — do not import into pages.
  */
 export const articles: Article[] = [
   article({

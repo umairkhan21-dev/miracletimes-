@@ -2,6 +2,7 @@
 
 import { ArticleList } from "@/components/ArticleList";
 import { Pagination } from "@/components/Pagination";
+import { useT } from "@/components/LanguageProvider";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { Article } from "@/lib/types";
@@ -13,6 +14,7 @@ export function PagedArticleList({
   articles: Article[];
   pageSize?: number;
 }) {
+  const t = useT();
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
@@ -48,7 +50,7 @@ export function PagedArticleList({
   }
 
   if (!articles.length) {
-    return <p className="feed-note">इस सूची में अभी और खबरें नहीं हैं।</p>;
+    return <p className="feed-note">{t("feed.empty")}</p>;
   }
 
   return (

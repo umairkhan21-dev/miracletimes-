@@ -1,4 +1,6 @@
 import { demoPath } from "@/lib/paths";
+import type { Locale } from "@/lib/i18n/config";
+import type { MessageKey } from "@/messages/hi";
 import type { Category, InfoLink } from "@/lib/types";
 
 export const categories: Category[] = [
@@ -31,32 +33,28 @@ export const categories: Category[] = [
     name: "देश",
     english: "National",
     href: demoPath("/category/national"),
-    description:
-      "रेल, ऊर्जा और शिक्षा जैसे राष्ट्रीय विषयों पर नमूना कवरेज।",
+    description: "रेल, ऊर्जा और शिक्षा जैसे राष्ट्रीय विषयों पर नमूना कवरेज।",
   },
   {
     slug: "world",
     name: "दुनिया",
     english: "World",
     href: demoPath("/category/world"),
-    description:
-      "व्यापार और जलवायु जैसे अंतरराष्ट्रीय विषयों की संक्षिप्त नमूना खबरें।",
+    description: "व्यापार और जलवायु जैसे अंतरराष्ट्रीय विषयों की संक्षिप्त नमूना खबरें।",
   },
   {
     slug: "business",
     name: "कारोबार",
     english: "Business",
     href: demoPath("/category/business"),
-    description:
-      "लघु उद्योग, मंडी और स्थानीय कारोबार पर नमूना आर्थिक रिपोर्ट।",
+    description: "लघु उद्योग, मंडी और स्थानीय कारोबार पर नमूना आर्थिक रिपोर्ट।",
   },
   {
     slug: "education",
     name: "शिक्षा",
     english: "Education",
     href: demoPath("/category/education"),
-    description:
-      "परीक्षा, छात्रवृत्ति और पुस्तकालयों से जुड़ी नमूना शैक्षणिक सूचनाएँ।",
+    description: "परीक्षा, छात्रवृत्ति और पुस्तकालयों से जुड़ी नमूना शैक्षणिक सूचनाएँ।",
   },
   {
     slug: "crime",
@@ -71,24 +69,21 @@ export const categories: Category[] = [
     name: "टेक्नोलॉजी",
     english: "Technology",
     href: demoPath("/category/technology"),
-    description:
-      "डिजिटल सेवाओं और नागरिक तकनीक पर सरल नमूना व्याख्या।",
+    description: "डिजिटल सेवाओं और नागरिक तकनीक पर सरल नमूना व्याख्या।",
   },
   {
     slug: "sports",
     name: "खेल",
     english: "Sports",
     href: demoPath("/category/sports"),
-    description:
-      "स्थानीय क्रिकेट और खेल शिविरों की नमूना खेल खबरें।",
+    description: "स्थानीय क्रिकेट और खेल शिविरों की नमूना खेल खबरें।",
   },
   {
     slug: "entertainment",
     name: "मनोरंजन",
     english: "Entertainment",
     href: demoPath("/category/entertainment"),
-    description:
-      "रंगमंच, लोकगीत और सामुदायिक कार्यक्रमों की नमूना सांस्कृतिक खबरें।",
+    description: "रंगमंच, लोकगीत और सामुदायिक कार्यक्रमों की नमूना सांस्कृतिक खबरें।",
   },
   {
     slug: "health",
@@ -110,19 +105,49 @@ export const navItems = [
   })),
 ];
 
-export const infoLinks: InfoLink[] = [
-  { href: demoPath("/about"), label: "हमारे बारे में" },
-  { href: demoPath("/contact"), label: "संपर्क करें" },
-  { href: demoPath("/privacy"), label: "गोपनीयता नीति" },
-  { href: demoPath("/terms"), label: "नियम और शर्तें" },
-  { href: demoPath("/editorial-policy"), label: "संपादकीय नीति" },
-  { href: demoPath("/corrections"), label: "शुद्धि नीति" },
+export type InfoLinkKey =
+  | "footer.about"
+  | "footer.contact"
+  | "footer.privacy"
+  | "footer.terms"
+  | "footer.editorial"
+  | "footer.corrections";
+
+export const infoLinks: Array<InfoLink & { labelKey: InfoLinkKey }> = [
+  { href: demoPath("/about"), label: "हमारे बारे में", labelKey: "footer.about" },
+  { href: demoPath("/contact"), label: "संपर्क करें", labelKey: "footer.contact" },
+  { href: demoPath("/privacy"), label: "गोपनीयता नीति", labelKey: "footer.privacy" },
+  { href: demoPath("/terms"), label: "नियम और शर्तें", labelKey: "footer.terms" },
+  {
+    href: demoPath("/editorial-policy"),
+    label: "संपादकीय नीति",
+    labelKey: "footer.editorial",
+  },
+  {
+    href: demoPath("/corrections"),
+    label: "शुद्धि नीति",
+    labelKey: "footer.corrections",
+  },
 ];
 
 export function getCategory(slug: string) {
   return categories.find((category) => category.slug === slug);
 }
 
-export function categoryName(slug: string) {
-  return getCategory(slug)?.name ?? slug;
+export function categoryName(slug: string, locale: Locale = "hi") {
+  const category = getCategory(slug);
+  if (!category) return slug;
+  return locale === "en" ? category.english : category.name;
+}
+
+export function categoryDescriptionKey(slug: string): MessageKey | null {
+  const key = `catDesc.${slug}` as MessageKey;
+  return key;
+}
+
+export function navLabel(
+  item: { name: string; english: string },
+  locale: Locale,
+) {
+  return locale === "en" ? item.english : item.name;
 }

@@ -1,3 +1,7 @@
+"use client";
+
+import { useT } from "@/components/LanguageProvider";
+
 type PaginationProps = {
   page: number;
   pageCount: number;
@@ -5,6 +9,7 @@ type PaginationProps = {
 };
 
 export function Pagination({ page, pageCount, onPage }: PaginationProps) {
+  const t = useT();
   if (pageCount <= 1) return null;
 
   const items: Array<number | "gap"> = [];
@@ -19,14 +24,14 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
   }
 
   return (
-    <nav className="pagination" aria-label="पृष्ठ">
+    <nav className="pagination" aria-label={t("a11y.pagination")}>
       <button
         type="button"
         className="page-btn"
         onClick={() => onPage(page - 1)}
         disabled={page <= 1}
       >
-        पिछला
+        {t("pagination.prev")}
       </button>
       <ol>
         {items.map((item, index) =>
@@ -54,7 +59,7 @@ export function Pagination({ page, pageCount, onPage }: PaginationProps) {
         onClick={() => onPage(page + 1)}
         disabled={page >= pageCount}
       >
-        अगला
+        {t("pagination.next")}
       </button>
     </nav>
   );

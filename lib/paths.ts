@@ -1,25 +1,27 @@
-/** Base path for the sample news experience. Root `/` stays coming-soon. */
-export const DEMO_BASE = "/demo";
-
 /**
- * Build an in-app href under `/demo`.
- * Pass `"/"` or `""` for the demo homepage.
+ * Build an in-app href at the site root.
+ * Pass `"/"` or `""` for the homepage.
  * Does not force a trailing slash; Next `trailingSlash: true` handles that.
  */
-export function demoPath(path: string = "/"): string {
-  if (!path || path === "/") return DEMO_BASE;
-  const normalized = path.startsWith("/") ? path : `/${path}`;
-  return `${DEMO_BASE}${normalized}`;
+export function sitePath(path: string = "/"): string {
+  if (!path || path === "/") return "/";
+  return path.startsWith("/") ? path : `/${path}`;
 }
 
-/** Absolute site URL for a demo path (always trailing slash except bare host handling). */
-export function demoAbsoluteUrl(siteUrl: string, path: string = "/"): string {
+/** @deprecated Use sitePath — kept so existing imports keep working. */
+export const demoPath = sitePath;
+
+/** Absolute site URL for a path (always trailing slash). */
+export function absoluteSiteUrl(siteUrl: string, path: string = "/"): string {
   const origin = siteUrl.replace(/\/$/, "");
-  if (!path || path === "/") return `${origin}${DEMO_BASE}/`;
+  if (!path || path === "/") return `${origin}/`;
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const withSlash = normalized.endsWith("/") ? normalized : `${normalized}/`;
-  return `${origin}${DEMO_BASE}${withSlash}`;
+  return `${origin}${withSlash}`;
 }
+
+/** @deprecated Use absoluteSiteUrl. */
+export const demoAbsoluteUrl = absoluteSiteUrl;
 
 export function normalizePathname(path: string): string {
   if (!path) return "/";
@@ -27,6 +29,9 @@ export function normalizePathname(path: string): string {
   return trimmed || "/";
 }
 
-export function isDemoHomePath(pathname: string): boolean {
-  return normalizePathname(pathname) === DEMO_BASE;
+export function isHomePath(pathname: string): boolean {
+  return normalizePathname(pathname) === "/";
 }
+
+/** @deprecated Use isHomePath. */
+export const isDemoHomePath = isHomePath;

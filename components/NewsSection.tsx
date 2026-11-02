@@ -1,8 +1,12 @@
+"use client";
+
 import { ArticleCard } from "@/components/ArticleCard";
+import { useT } from "@/components/LanguageProvider";
 import type { HomeSection } from "@/lib/content";
 import Link from "next/link";
 
 export function NewsSection({ section }: { section: HomeSection }) {
+  const t = useT();
   const [feature, ...rest] = section.articles;
   if (!feature) return null;
 
@@ -16,11 +20,11 @@ export function NewsSection({ section }: { section: HomeSection }) {
   return (
     <section className="news-section" aria-labelledby={`section-${section.id}`}>
       <header className="section-head">
-        <h2 id={`section-${section.id}`}>{section.title}</h2>
+        <h2 id={`section-${section.id}`}>{t(section.titleKey)}</h2>
         <p className="section-links">
-          <Link href={section.href}>सभी खबरें देखें</Link>
+          <Link href={section.href}>{t("home.viewAll")}</Link>
           {section.extra ? (
-            <Link href={section.extra.href}>{section.extra.label}</Link>
+            <Link href={section.extra.href}>{t(section.extra.labelKey)}</Link>
           ) : null}
         </p>
       </header>

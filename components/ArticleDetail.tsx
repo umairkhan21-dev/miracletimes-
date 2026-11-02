@@ -1,22 +1,138 @@
+"use client";
+
 import { ArticleList } from "@/components/ArticleList";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import {
+  ContentLoading,
+  ContentUnavailable,
+} from "@/components/ContentStatus";
+import { EmptyState } from "@/components/EmptyState";
 import { NewsImage } from "@/components/NewsImage";
 import { ShareButtons } from "@/components/ShareButtons";
+import { useI18n } from "@/components/LanguageProvider";
+import { ApiError, resolveArticleForLocale } from "@/lib/api";
 import { categoryName } from "@/lib/categories";
-import { getAdjacent, getLatest, getRelated } from "@/lib/content";
+import {
+  loadArticles,
+  loadArticlesByCategory,
+  selectAdjacent,
+  selectLatest,
+  selectRelated,
+} from "@/lib/content";
 import { formatDateTime } from "@/lib/format";
 import { demoAbsoluteUrl, demoPath } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { Article } from "@/lib/types";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
-export function ArticleDetail({ article }: { article: Article }) {
-  const name = categoryName(article.category);
+type DetailState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "missing" }
+  | {
+      status: "ready";
+      article: Article;
+      related: Article[];
+      latest: Article[];
+      newer?: Article;
+      older?: Article;
+    };
+
+export function ArticleDetail({ slug }: { slug: string }) {
+  const { locale, t } = useI18n();
+  const router = useRouter();
+  const [state, setState] = useState<DetailState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState({ status: "loading" });
+
+    (async () => {
+      try {
+        const resolved = await resolveArticleForLocale(slug, locale);
+        if (cancelled) return;
+
+        if (!resolved) {
+          setState({ status: "missing" });
+          return;
+        }
+
+        if (resolved.canonicalSlug !== slug) {
+          router.replace(demoPath(`/news/${resolved.canonicalSlug}`));
+        }
+
+        const [categoryArticles, allArticles] = await Promise.all([
+          loadArticlesByCategory(locale, resolved.article.category),
+          loadArticles(locale),
+        ]);
+        if (cancelled) return;
+
+        const { newer, older } = selectAdjacent(
+          categoryArticles,
+          resolved.article,
+        );
+
+        setState({
+          status: "ready",
+          article: resolved.article,
+          related: selectRelated(categoryArticles, resolved.article),
+          latest: selectLatest(allArticles, resolved.article.id, 5),
+          newer,
+          older,
+        });
+      } catch (error) {
+        if (cancelled) return;
+        console.error(
+          error instanceof ApiError ? error.message : "Article load failed",
+        );
+        setState({ status: "error" });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [slug, locale, router]);
+
+  if (state.status === "loading") {
+    return <ContentLoading message={t("content.loading")} />;
+  }
+
+  if (state.status === "error") {
+    return (
+      <ContentUnavailable
+        title={t("content.unavailableTitle")}
+        message={t("content.unavailableMessage")}
+        actionLabel={t("category.goHome")}
+      />
+    );
+  }
+
+  if (state.status === "missing") {
+    return (
+      <div className="wrap page-block">
+        <EmptyState
+          title={t("content.articleMissingTitle")}
+          message={t("content.articleMissingMessage")}
+          action={{ href: demoPath("/"), label: t("category.goHome") }}
+          heading="h1"
+        />
+      </div>
+    );
+  }
+
+  const { article, related, latest, newer, older } = state;
+  const name = categoryName(article.category, locale);
   const categoryHref = demoPath(`/category/${article.category}`);
-  const related = getRelated(article);
-  const latest = getLatest(article.id, 5);
-  const { newer, older } = getAdjacent(article);
   const url = demoAbsoluteUrl(site.url, `/news/${article.slug}`);
+  const imageUrl = article.image
+    ? article.image.startsWith("http")
+      ? article.image
+      : `${site.url}${article.image}`
+    : undefined;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "NewsArticle",
@@ -24,9 +140,9 @@ export function ArticleDetail({ article }: { article: Article }) {
     description: article.summary,
     datePublished: article.publishedAt,
     dateModified: article.updatedAt ?? article.publishedAt,
-    inLanguage: "hi",
+    inLanguage: locale,
     articleSection: name,
-    image: [`${site.url}${article.image}`],
+    ...(imageUrl ? { image: [imageUrl] } : {}),
     author: { "@type": "Organization", name: article.author },
     publisher: {
       "@type": "Organization",
@@ -45,7 +161,7 @@ export function ArticleDetail({ article }: { article: Article }) {
     <article className="wrap article-page">
       <Breadcrumbs
         items={[
-          { label: "होम", href: demoPath("/") },
+          { label: t("nav.home"), href: demoPath("/") },
           { label: name, href: categoryHref },
           { label: article.title },
         ]}
@@ -53,7 +169,7 @@ export function ArticleDetail({ article }: { article: Article }) {
       <header className="story-header">
         <p className="kicker">
           <Link href={categoryHref}>{name}</Link>
-          <span className="sample-tag">नमूना</span>
+          <span className="sample-tag">{t("label.sample")}</span>
         </p>
         <h1>{article.title}</h1>
         <p className="story-dek">{article.summary}</p>
@@ -61,13 +177,13 @@ export function ArticleDetail({ article }: { article: Article }) {
           <span>{article.author}</span>
           <span aria-hidden="true">·</span>
           <time dateTime={article.publishedAt}>
-            प्रकाशित: {formatDateTime(article.publishedAt)}
+            {t("label.published")}: {formatDateTime(article.publishedAt, locale)}
           </time>
           {article.updatedAt ? (
             <>
               <span aria-hidden="true">·</span>
               <time dateTime={article.updatedAt}>
-                अपडेट: {formatDateTime(article.updatedAt)}
+                {t("label.updated")}: {formatDateTime(article.updatedAt, locale)}
               </time>
             </>
           ) : null}
@@ -88,9 +204,7 @@ export function ArticleDetail({ article }: { article: Article }) {
         {article.imageCaption ? <figcaption>{article.imageCaption}</figcaption> : null}
       </figure>
 
-      <p className="sample-note">
-        यह रिपोर्ट नमूना सामग्री है। इसे सत्यापित समाचार, आधिकारिक बयान या चिकित्सकीय सलाह न समझें।
-      </p>
+      <p className="sample-note">{t("article.sampleNote")}</p>
 
       <div className="story-body">
         {article.content.map((block, index) =>
@@ -103,15 +217,15 @@ export function ArticleDetail({ article }: { article: Article }) {
       </div>
 
       <p className="story-back">
-        <Link href={categoryHref}>{name} की सभी खबरें</Link>
-        <Link href={demoPath("/")}>होम</Link>
+        <Link href={categoryHref}>{t("article.allInCategory", { name })}</Link>
+        <Link href={demoPath("/")}>{t("nav.home")}</Link>
       </p>
 
       {older || newer ? (
-        <nav className="story-pager" aria-label="पिछली और अगली खबर">
+        <nav className="story-pager" aria-label={t("a11y.prevNextStory")}>
           {older ? (
             <Link href={demoPath(`/news/${older.slug}`)} className="story-pager-link">
-              <span>पिछली खबर</span>
+              <span>{t("article.prev")}</span>
               <strong>{older.title}</strong>
             </Link>
           ) : (
@@ -119,7 +233,7 @@ export function ArticleDetail({ article }: { article: Article }) {
           )}
           {newer ? (
             <Link href={demoPath(`/news/${newer.slug}`)} className="story-pager-link is-next">
-              <span>अगली खबर</span>
+              <span>{t("article.next")}</span>
               <strong>{newer.title}</strong>
             </Link>
           ) : null}
@@ -128,14 +242,14 @@ export function ArticleDetail({ article }: { article: Article }) {
 
       {related.length ? (
         <section className="story-more" aria-labelledby="related-title">
-          <h2 id="related-title">इसी श्रेणी से</h2>
+          <h2 id="related-title">{t("article.related")}</h2>
           <ArticleList articles={related} variant="row" />
         </section>
       ) : null}
 
       {latest.length ? (
         <section className="story-more" aria-labelledby="latest-title">
-          <h2 id="latest-title">ताज़ा खबरें</h2>
+          <h2 id="latest-title">{t("article.latest")}</h2>
           <ArticleList articles={latest} variant="text" />
         </section>
       ) : null}

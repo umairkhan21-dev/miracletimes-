@@ -1,4 +1,7 @@
+"use client";
+
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { useT } from "@/components/LanguageProvider";
 import { demoPath } from "@/lib/paths";
 import type { ReactNode } from "react";
 
@@ -11,9 +14,13 @@ export function InfoLayout({
   lede: string;
   children: ReactNode;
 }) {
+  const t = useT();
+
   return (
     <article className="wrap info-page">
-      <Breadcrumbs items={[{ label: "होम", href: demoPath("/") }, { label: title }]} />
+      <Breadcrumbs
+        items={[{ label: t("nav.home"), href: demoPath("/") }, { label: title }]}
+      />
       <header className="page-intro">
         <h1>{title}</h1>
         <p>{lede}</p>

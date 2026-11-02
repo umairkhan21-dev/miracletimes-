@@ -1,4 +1,7 @@
+"use client";
+
 import { NewsImage } from "@/components/NewsImage";
+import { useI18n } from "@/components/LanguageProvider";
 import { categoryName } from "@/lib/categories";
 import { formatDateTime, formatTime } from "@/lib/format";
 import { demoPath } from "@/lib/paths";
@@ -8,11 +11,20 @@ import Link from "next/link";
 type CardVariant = "support" | "rail" | "grid" | "feature" | "text" | "row";
 type Heading = "h2" | "h3";
 
-function Meta({ article, withTime = true }: { article: Article; withTime?: boolean }) {
+function Meta({
+  article,
+  withTime = true,
+}: {
+  article: Article;
+  withTime?: boolean;
+}) {
+  const { locale } = useI18n();
   return (
     <p className="meta">
       <time dateTime={article.publishedAt}>
-        {withTime ? formatDateTime(article.publishedAt) : formatTime(article.publishedAt)}
+        {withTime
+          ? formatDateTime(article.publishedAt, locale)
+          : formatTime(article.publishedAt, locale)}
       </time>
       <span aria-hidden="true">·</span>
       <span>{article.author}</span>
@@ -31,15 +43,18 @@ export function ArticleCard({
   heading?: Heading;
   priority?: boolean;
 }) {
+  const { locale, t } = useI18n();
   const Title = heading;
   const href = demoPath(`/news/${article.slug}`);
   const categoryHref = demoPath(`/category/${article.category}`);
-  const name = categoryName(article.category);
+  const name = categoryName(article.category, locale);
 
   if (variant === "rail") {
     return (
       <li className="rail-item">
-        <time dateTime={article.publishedAt}>{formatTime(article.publishedAt)}</time>
+        <time dateTime={article.publishedAt}>
+          {formatTime(article.publishedAt, locale)}
+        </time>
         <div>
           <Link href={href}>{article.title}</Link>
           <span className="rail-cat">{name}</span>
@@ -64,13 +79,13 @@ export function ArticleCard({
         <div>
           <p className="kicker">
             <Link href={categoryHref}>{name}</Link>
-            <span className="sample-tag">नमूना</span>
+            <span className="sample-tag">{t("label.sample")}</span>
           </p>
           <Title>
             <Link href={href}>{article.title}</Link>
           </Title>
           <time className="meta" dateTime={article.publishedAt}>
-            {formatDateTime(article.publishedAt)}
+            {formatDateTime(article.publishedAt, locale)}
           </time>
         </div>
       </article>
@@ -98,7 +113,7 @@ export function ArticleCard({
             <Link href={href}>{article.title}</Link>
           </Title>
           <time className="meta" dateTime={article.publishedAt}>
-            {formatDateTime(article.publishedAt)}
+            {formatDateTime(article.publishedAt, locale)}
           </time>
         </div>
       </article>
@@ -127,7 +142,7 @@ export function ArticleCard({
       <div className="card-body">
         <p className="kicker">
           <Link href={categoryHref}>{name}</Link>
-          <span className="sample-tag">नमूना</span>
+          <span className="sample-tag">{t("label.sample")}</span>
         </p>
         <Title className="card-title">
           <Link href={href}>{article.title}</Link>

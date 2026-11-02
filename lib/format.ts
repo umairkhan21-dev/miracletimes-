@@ -1,27 +1,6 @@
-const months = [
-  "जनवरी",
-  "फ़रवरी",
-  "मार्च",
-  "अप्रैल",
-  "मई",
-  "जून",
-  "जुलाई",
-  "अगस्त",
-  "सितंबर",
-  "अक्टूबर",
-  "नवंबर",
-  "दिसंबर",
-];
-
-const weekdays = [
-  "रविवार",
-  "सोमवार",
-  "मंगलवार",
-  "बुधवार",
-  "गुरुवार",
-  "शुक्रवार",
-  "शनिवार",
-];
+import { DEFAULT_LOCALE, type Locale } from "@/lib/i18n/config";
+import { translate } from "@/lib/i18n/translate";
+import type { MessageKey } from "@/messages/hi";
 
 type IstParts = {
   year: number;
@@ -46,33 +25,41 @@ function istParts(iso: string): IstParts | null {
   };
 }
 
-function clock(parts: IstParts) {
-  const period = parts.hour < 12 ? "पूर्वाह्न" : "अपराह्न";
+function clock(parts: IstParts, locale: Locale) {
+  const period = translate(locale, parts.hour < 12 ? "date.am" : "date.pm");
   const hour = parts.hour % 12 || 12;
   const minute = String(parts.minute).padStart(2, "0");
   return `${hour}:${minute} ${period}`;
 }
 
-export function formatLongDate(iso: string) {
-  const parts = istParts(iso);
-  if (!parts) return "";
-  return `${weekdays[parts.weekday]}, ${parts.day} ${months[parts.month]} ${parts.year}`;
+function monthKey(month: number): MessageKey {
+  return `date.month.${month}` as MessageKey;
 }
 
-export function formatDate(iso: string) {
-  const parts = istParts(iso);
-  if (!parts) return "";
-  return `${parts.day} ${months[parts.month]} ${parts.year}`;
+function weekdayKey(weekday: number): MessageKey {
+  return `date.weekday.${weekday}` as MessageKey;
 }
 
-export function formatDateTime(iso: string) {
+export function formatLongDate(iso: string, locale: Locale = DEFAULT_LOCALE) {
   const parts = istParts(iso);
   if (!parts) return "";
-  return `${formatDate(iso)}, ${clock(parts)}`;
+  return `${translate(locale, weekdayKey(parts.weekday))}, ${parts.day} ${translate(locale, monthKey(parts.month))} ${parts.year}`;
 }
 
-export function formatTime(iso: string) {
+export function formatDate(iso: string, locale: Locale = DEFAULT_LOCALE) {
   const parts = istParts(iso);
   if (!parts) return "";
-  return clock(parts);
+  return `${parts.day} ${translate(locale, monthKey(parts.month))} ${parts.year}`;
+}
+
+export function formatDateTime(iso: string, locale: Locale = DEFAULT_LOCALE) {
+  const parts = istParts(iso);
+  if (!parts) return "";
+  return `${formatDate(iso, locale)}, ${clock(parts, locale)}`;
+}
+
+export function formatTime(iso: string, locale: Locale = DEFAULT_LOCALE) {
+  const parts = istParts(iso);
+  if (!parts) return "";
+  return clock(parts, locale);
 }

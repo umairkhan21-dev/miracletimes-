@@ -1,6 +1,7 @@
 "use client";
 
 import { LinkIcon, ShareIcon } from "@/components/Icons";
+import { useT } from "@/components/LanguageProvider";
 import { useEffect, useState } from "react";
 
 export function ShareButtons({
@@ -12,6 +13,7 @@ export function ShareButtons({
   summary: string;
   path: string;
 }) {
+  const t = useT();
   const [url, setUrl] = useState(path);
   const [message, setMessage] = useState("");
 
@@ -22,9 +24,9 @@ export function ShareButtons({
   async function copyLink() {
     try {
       await navigator.clipboard.writeText(url);
-      setMessage("लिंक कॉपी हो गया");
+      setMessage(t("article.copied"));
     } catch {
-      setMessage(`लिंक कॉपी नहीं हो सका। इसे चुनकर कॉपी करें: ${url}`);
+      setMessage(t("article.copyFailed", { url }));
     }
   }
 
@@ -46,11 +48,11 @@ export function ShareButtons({
     <div className="share-tools">
       <button type="button" className="btn" onClick={share}>
         <ShareIcon />
-        साझा करें
+        {t("article.share")}
       </button>
       <button type="button" className="btn" onClick={copyLink}>
         <LinkIcon />
-        लिंक कॉपी करें
+        {t("article.copyLink")}
       </button>
       <p className="share-status" role="status">
         {message}

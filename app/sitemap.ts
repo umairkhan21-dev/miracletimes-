@@ -1,6 +1,6 @@
+import { fetchAllArticles } from "@/lib/api";
 import { categories, infoLinks } from "@/lib/categories";
-import { getArticles } from "@/lib/content";
-import { demoAbsoluteUrl } from "@/lib/paths";
+import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { MetadataRoute } from "next";
 
@@ -12,43 +12,56 @@ function absoluteHref(href: string): string {
   return `${origin}${path.endsWith("/") ? path : `${path}/`}`;
 }
 
-export default function sitemap(): MetadataRoute.Sitemap {
-  const articles = getArticles();
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  let articles: Awaited<ReturnType<typeof fetchAllArticles>> = [];
+  try {
+    const [hiArticles, enArticles] = await Promise.all([
+      fetchAllArticles({ language: "hi" }),
+      fetchAllArticles({ language: "en" }),
+    ]);
+    const seen = new Set<string>();
+    articles = [...hiArticles, ...enArticles].filter((article) => {
+      if (seen.has(article.slug)) return false;
+      seen.add(article.slug);
+      return true;
+    });
+  } catch (error) {
+    console.warn(
+      "Sitemap could not load articles from API:",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   const lastArticle = articles[0]?.publishedAt;
 
   return [
     {
-      url: `${site.url}/`,
-      changeFrequency: "monthly",
+      url: absoluteSiteUrl(site.url, "/"),
+      lastModified: lastArticle,
+      changeFrequency: "hourly",
       priority: 1,
     },
     {
-      url: demoAbsoluteUrl(site.url, "/"),
+      url: absoluteSiteUrl(site.url, "/latest"),
       lastModified: lastArticle,
-      changeFrequency: "weekly",
-      priority: 0.4,
-    },
-    {
-      url: demoAbsoluteUrl(site.url, "/latest"),
-      lastModified: lastArticle,
-      changeFrequency: "weekly",
-      priority: 0.3,
+      changeFrequency: "hourly",
+      priority: 0.8,
     },
     ...categories.map((category) => ({
       url: absoluteHref(category.href),
-      changeFrequency: "weekly" as const,
-      priority: 0.3,
+      changeFrequency: "daily" as const,
+      priority: 0.7,
     })),
     ...infoLinks.map((link) => ({
       url: absoluteHref(link.href),
       changeFrequency: "yearly" as const,
-      priority: 0.2,
+      priority: 0.3,
     })),
     ...articles.map((article) => ({
-      url: demoAbsoluteUrl(site.url, `/news/${article.slug}`),
+      url: absoluteSiteUrl(site.url, `/news/${article.slug}`),
       lastModified: article.updatedAt ?? article.publishedAt,
       changeFrequency: "weekly" as const,
-      priority: 0.2,
+      priority: 0.6,
     })),
   ];
 }

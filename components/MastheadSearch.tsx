@@ -1,10 +1,12 @@
 "use client";
 
 import { SearchIcon } from "@/components/Icons";
+import { useT } from "@/components/LanguageProvider";
 import { demoPath } from "@/lib/paths";
 import { useEffect, useId, useRef, useState } from "react";
 
 export function MastheadSearch() {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const formId = useId();
@@ -29,7 +31,9 @@ export function MastheadSearch() {
         onClick={() => setOpen((value) => !value)}
       >
         <SearchIcon />
-        <span className="sr-only">{open ? "खोज बंद करें" : "खोज खोलें"}</span>
+        <span className="sr-only">
+          {open ? t("a11y.searchClose") : t("a11y.searchOpen")}
+        </span>
       </button>
       <form
         id={formId}
@@ -39,18 +43,18 @@ export function MastheadSearch() {
         role="search"
       >
         <label className="sr-only" htmlFor="site-query">
-          खबरें खोजें
+          {t("search.mastheadLabel")}
         </label>
         <input
           ref={inputRef}
           id="site-query"
           name="q"
           type="search"
-          placeholder="खबरें खोजें"
+          placeholder={t("search.mastheadPlaceholder")}
           autoComplete="off"
           enterKeyHint="search"
         />
-        <button type="submit" className="icon-btn" aria-label="खोजें">
+        <button type="submit" className="icon-btn" aria-label={t("a11y.searchSubmit")}>
           <SearchIcon />
         </button>
       </form>
