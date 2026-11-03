@@ -609,7 +609,13 @@ async function getAdminArticleById(id) {
   };
 }
 
-async function listAdminArticles({ page = 1, limit = 20, status, language = "hi" } = {}) {
+async function listAdminArticles({
+  page = 1,
+  limit = 20,
+  status,
+  language = "hi",
+  search,
+} = {}) {
   const pagination = parsePagination({ page, limit });
   const where = ["1=1"];
   const params = { language };
@@ -619,9 +625,23 @@ async function listAdminArticles({ page = 1, limit = 20, status, language = "hi"
     params.status = status;
   }
 
+  if (search) {
+    where.push(`(
+      t.title LIKE :search
+      OR t.summary LIKE :search
+      OR t.slug LIKE :search
+      OR a.public_id LIKE :search
+    )`);
+    params.search = `%${search}%`;
+  }
+
   const whereSql = where.join(" AND ");
   const countRows = await query(
-    `SELECT COUNT(*) AS total FROM articles a WHERE ${whereSql}`,
+    `SELECT COUNT(*) AS total
+     FROM articles a
+     INNER JOIN article_translations t
+       ON t.article_id = a.id AND t.language_code = :language
+     WHERE ${whereSql}`,
     params,
   );
   const rows = await query(

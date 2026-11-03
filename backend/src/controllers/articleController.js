@@ -56,6 +56,7 @@ const listAdmin = asyncHandler(async (req, res) => {
     limit: Number(req.query.limit) || 20,
     status: req.query.status,
     language: req.query.language || "hi",
+    search: typeof req.query.q === "string" ? req.query.q.trim() : undefined,
   });
   return ok(res, result.articles, 200, result.meta);
 });

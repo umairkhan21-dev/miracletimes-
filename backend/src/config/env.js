@@ -20,7 +20,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().url(),
   CORS_ORIGINS: z.string().optional(),
   UPLOAD_DIR: z.string().default("uploads"),
-  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(5_242_880),
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(1_048_576),
   PUBLIC_BASE_URL: z.string().url().default("http://localhost:4000"),
   SCHEDULE_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
 });

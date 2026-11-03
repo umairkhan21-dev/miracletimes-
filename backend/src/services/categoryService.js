@@ -9,7 +9,7 @@ function mapCategoryRow(row, language = "hi") {
     name: row.name,
     english: row.english_name || row.name,
     description: row.description,
-    href: `/demo/category/${row.slug}`,
+    href: `/category/${row.slug}`,
     isActive: Boolean(row.is_active),
     displayOrder: Number(row.display_order),
     language,
