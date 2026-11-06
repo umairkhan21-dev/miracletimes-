@@ -22,9 +22,14 @@ npm install
 | Variable | Purpose |
 |---|---|
 | `PORT` | API port (default `4000`) |
-| `DB_*` | MySQL connection |
-| `JWT_SECRET` | Signing secret (min 16 chars) |
-| `FRONTEND_URL` / `CORS_ORIGINS` | Allowed browser origins |
+| `LISTEN_HOST` | Optional bind address (e.g. `127.0.0.1` behind a proxy; unset = all interfaces) |
+| `DB_*` | MySQL connection (`DB_PASSWORD` required non-empty in production) |
+| `JWT_SECRET` | Signing secret (min 16 chars locally; **≥32 + non-placeholder in production**) |
+| `JWT_EXPIRES_IN` | Token + cookie lifetime (e.g. `1d`; cookie `maxAge` matches) |
+| `FRONTEND_URL` / `CORS_ORIGINS` | Allowed browser origins (exact list; HTTPS + required `CORS_ORIGINS` in production) |
+| `FRONTEND_DEPLOY_HOOK_URL` | Vercel Deploy Hook; **required HTTPS in production**; leave empty locally |
+| `FRONTEND_DEPLOY_DEBOUNCE_MS` | Optional debounce for deploy hook (default 45000) |
+| `COOKIE_DOMAIN` | Optional shared parent domain for the auth cookie |
 | `UPLOAD_DIR` | Local upload directory |
 | `PUBLIC_BASE_URL` | Public base URL used for uploaded file links |
 | `SCHEDULE_INTERVAL_MS` | Scheduled publishing poll interval |
@@ -53,6 +58,8 @@ There is **no public API** to create admins. Create the first admin with the CLI
 
 ```bash
 npm run seed:admin -- --name "Desk Admin" --email desk@miracletimes.in --password 'choose-a-long-password'
+# Rotate an existing admin password (does not print the secret):
+npm run seed:admin -- --email desk@miracletimes.in --password 'choose-a-long-password' --reset-password
 ```
 
 ## Seed bilingual categories
@@ -71,12 +78,15 @@ POST /api/auth/logout
 GET  /api/auth/me
 ```
 
-Login returns a JWT and also sets an httpOnly cookie (`COOKIE_NAME`, default `mt_token`). Send either:
+Login sets an **HttpOnly** cookie (`COOKIE_NAME`, default `mt_token`) and returns `{ user }` only — the JWT is **not** included in the JSON body.
 
-- `Authorization: Bearer <token>`, or
-- the cookie automatically from the browser (`credentials: 'include'`)
+Browser clients must call the API with `credentials: 'include'`. Non-browser clients may still send `Authorization: Bearer <token>` if they already hold a token.
 
 Roles: `admin`, `editor`, `author`. Inactive users cannot authenticate.
+
+Publication (`status` published/scheduled/archived, schedule/publish routes) is limited to `admin` and `editor`. Authors may create/edit **their own drafts** only: they cannot edit published or scheduled articles (including title, body, SEO, image, or category), cannot read other authors’ admin drafts, and cannot trigger status transitions.
+
+See also [docs/DEPLOYMENT_SECURITY.md](../docs/DEPLOYMENT_SECURITY.md).
 
 ## Public news APIs
 
@@ -164,11 +174,16 @@ The job uses a transaction + row lock (`FOR UPDATE`) and a process-local overlap
 
 ## Production checklist
 
-- Strong unique `JWT_SECRET`
-- Restrict `CORS_ORIGINS`
-- Terminate TLS in front of Node
+- Strong unique `JWT_SECRET` (≥32 chars, not an example value)
+- Non-empty `DB_PASSWORD`
+- Exact HTTPS `CORS_ORIGINS` / `FRONTEND_URL` / `PUBLIC_BASE_URL`
+- HTTPS `FRONTEND_DEPLOY_HOOK_URL` (required — API will not start without it)
+- `LISTEN_HOST=127.0.0.1` when behind a reverse proxy (unless the platform needs `0.0.0.0`)
+- Terminate TLS in front of Node; confirm `Secure` cookies
+- Apply static-site security headers at the CDN/edge (`vercel.json` / proxy)
 - Persist `uploads/` or switch to object storage
 - Run DB backups
 - Process manager (systemd, PM2, Docker) with restart policy
 - Monitor `/api/health`
 - Rotate admin passwords; never hardcode credentials
+- Full checklist: [docs/DEPLOYMENT_SECURITY.md](../docs/DEPLOYMENT_SECURITY.md)

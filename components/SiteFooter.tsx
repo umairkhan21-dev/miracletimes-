@@ -44,9 +44,6 @@ export function SiteFooter() {
                 <Link href={link.href}>{t(link.labelKey)}</Link>
               </li>
             ))}
-            <li>
-              <a href={demoPath("/feed.xml")}>{t("footer.rss")}</a>
-            </li>
           </ul>
         </nav>
       </div>

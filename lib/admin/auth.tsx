@@ -1,12 +1,7 @@
 "use client";
 
 import { ApiError } from "@/lib/api";
-import {
-  adminLogin,
-  adminLogout,
-  adminMe,
-  setAdminBearerToken,
-} from "@/lib/admin/api";
+import { adminLogin, adminLogout, adminMe } from "@/lib/admin/api";
 import type { AdminUser } from "@/lib/admin/types";
 import {
   createContext,
@@ -44,14 +39,12 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     try {
       const user = await adminMe();
       if (user.role !== "admin" || !user.isActive) {
-        setAdminBearerToken(null);
         await adminLogout().catch(() => undefined);
         setState({ status: "anonymous", user: null });
         return;
       }
       setState({ status: "authenticated", user });
     } catch (error) {
-      setAdminBearerToken(null);
       if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
         setState({ status: "anonymous", user: null });
         return;
@@ -74,7 +67,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
         "FORBIDDEN",
       );
     }
-    // Prefer HttpOnly cookie from the API; do not persist the JWT in storage.
+    // Session is the HttpOnly cookie set by the API — never store a JWT in JS.
     setState({ status: "authenticated", user: result.user });
     return result.user;
   }, []);

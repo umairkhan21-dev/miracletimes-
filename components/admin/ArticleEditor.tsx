@@ -4,25 +4,29 @@ import { AdminShell } from "@/components/admin/AdminShell";
 import { ApiError, resolveMediaUrl } from "@/lib/api";
 import {
   createAdminArticle,
-  deleteAdminMedia,
   fetchAdminArticle,
   fetchAdminCategories,
-  fetchAdminMedia,
   publishAdminArticle,
   scheduleAdminArticle,
   updateAdminArticle,
   uploadAdminMedia,
 } from "@/lib/admin/api";
-import { makePublicId, slugify } from "@/lib/admin/slug";
+import { makePublicId, slugFromHeadline, slugify } from "@/lib/admin/slug";
 import type {
   AdminCategory,
   AdminContentBlock,
-  AdminMedia,
   AdminTranslation,
   ArticleStatus,
   ArticleWritePayload,
 } from "@/lib/admin/types";
 import { assertImageWithinLimit } from "@/lib/admin/upload";
+import { absoluteSiteUrl } from "@/lib/paths";
+import {
+  effectiveSeoDescription,
+  effectiveSeoTitle,
+  trimSeo,
+} from "@/lib/seo";
+import { site } from "@/lib/site";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -73,7 +77,6 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [media, setMedia] = useState<AdminMedia[]>([]);
   const [langTab, setLangTab] = useState<"hi" | "en">("hi");
 
   const [publicId, setPublicId] = useState(() => makePublicId("story"));
@@ -86,30 +89,47 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
+  const feedbackRef = useRef<HTMLDivElement>(null);
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagsText, setTagsText] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
   const [scheduledAtLocal, setScheduledAtLocal] = useState("");
   const [hi, setHi] = useState<AdminTranslation>(() => emptyTranslation("hi"));
   const [en, setEn] = useState<AdminTranslation>(() => emptyTranslation("en"));
+  /** Once true for a language, title edits no longer overwrite the slug. */
+  const [slugLocked, setSlugLocked] = useState({ hi: false, en: false });
+  const [seoOpen, setSeoOpen] = useState(false);
+
+  function showError(messageText: string) {
+    setMessage(null);
+    setError(messageText);
+    // Defer scroll until the alert is painted near the action buttons.
+    requestAnimationFrame(() => {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  function showMessage(messageText: string) {
+    setError(null);
+    setMessage(messageText);
+    requestAnimationFrame(() => {
+      feedbackRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      fetchAdminCategories(),
-      fetchAdminMedia({ page: 1, limit: 24 }),
-    ])
-      .then(([cats, mediaResult]) => {
+    fetchAdminCategories()
+      .then((cats) => {
         if (cancelled) return;
         setCategories(cats);
-        setMedia(mediaResult.media);
       })
       .catch((err) => {
         if (cancelled) return;
         setError(
           err instanceof ApiError
             ? err.message
-            : "Unable to load categories or media.",
+            : "Unable to load categories.",
         );
       });
     return () => {
@@ -146,16 +166,22 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
           emptyTranslation("en");
         setHi({
           ...hiTranslation,
+          seoTitle: hiTranslation.seoTitle || "",
+          seoDescription: hiTranslation.seoDescription || "",
           content: hiTranslation.content.length
             ? hiTranslation.content
             : [{ type: "p", text: "" }],
         });
         setEn({
           ...enTranslation,
+          seoTitle: enTranslation.seoTitle || "",
+          seoDescription: enTranslation.seoDescription || "",
           content: enTranslation.content.length
             ? enTranslation.content
             : [{ type: "p", text: "" }],
         });
+        // Preserve existing slugs while editing; do not auto-resync from titles.
+        setSlugLocked({ hi: true, en: true });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -179,14 +205,28 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
     return slug ? `/news/${slug}/` : null;
   }, [langTab, hi.slug, en.slug]);
 
+  const serpTitle = effectiveSeoTitle(active.seoTitle, active.title);
+  const serpDescription = effectiveSeoDescription(
+    active.seoDescription,
+    active.summary,
+  );
+  const serpUrl = absoluteSiteUrl(
+    site.url,
+    active.slug.trim() ? `/news/${active.slug.trim()}` : "/news/",
+  );
+
   function updateTranslation(
     patch: Partial<AdminTranslation>,
     options?: { syncSlug?: boolean },
   ) {
     setActive((current) => {
       const next = { ...current, ...patch };
-      if (options?.syncSlug && patch.title && !isEdit) {
-        next.slug = slugify(patch.title);
+      const locked = slugLocked[current.languageCode];
+      if (options?.syncSlug && patch.title !== undefined && !locked) {
+        // publicId already unique — use it as a stable fallback for non-Latin titles.
+        next.slug = slugFromHeadline(patch.title, {
+          fallbackSeed: publicId,
+        });
       }
       return next;
     });
@@ -236,21 +276,36 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       .map((item) => item.trim())
       .filter(Boolean);
 
-    const normalizeTranslation = (item: AdminTranslation): AdminTranslation => ({
-      languageCode: item.languageCode,
-      slug: item.slug.trim(),
-      title: item.title.trim(),
-      summary: item.summary.trim(),
-      authorDisplayName: item.authorDisplayName?.trim() || null,
-      imageAlt: item.imageAlt || "",
-      imageCaption: item.imageCaption || null,
-      imagePosition: item.imagePosition || "center",
-      seoTitle: item.seoTitle || null,
-      seoDescription: item.seoDescription || null,
-      content: item.content
-        .map((block) => ({ type: block.type, text: block.text.trim() }))
-        .filter((block) => block.text.length > 0),
-    });
+    const normalizeTranslation = (item: AdminTranslation): AdminTranslation => {
+      const title = item.title.trim();
+      const summary = item.summary.trim();
+      let slug = item.slug.trim();
+      if (!slug && title) {
+        slug = slugFromHeadline(title, {
+          fallbackSeed: publicId,
+          ensureUnique: true,
+        });
+      }
+      const seoTitle = trimSeo(item.seoTitle);
+      const seoDescription = trimSeo(item.seoDescription);
+
+      return {
+        languageCode: item.languageCode,
+        slug,
+        title,
+        summary,
+        authorDisplayName: item.authorDisplayName?.trim() || null,
+        imageAlt: item.imageAlt || "",
+        imageCaption: item.imageCaption || null,
+        imagePosition: item.imagePosition || "center",
+        // Persist null when empty so the public site can fall back at render time.
+        seoTitle: seoTitle || null,
+        seoDescription: seoDescription || null,
+        content: item.content
+          .map((block) => ({ type: block.type, text: block.text.trim() }))
+          .filter((block) => block.text.length > 0),
+      };
+    };
 
     return {
       publicId: publicId.trim(),
@@ -284,32 +339,34 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   }
 
   async function save(nextStatus: ArticleStatus) {
-    setError(null);
-    setMessage(null);
     const payload = buildPayload(nextStatus);
     const validationError = validatePayload(payload);
     if (validationError) {
-      setError(validationError);
+      showError(validationError);
       return;
     }
 
     setSaving(true);
+    setError(null);
+    setMessage(null);
     try {
       if (isEdit && articleId) {
         const updated = await updateAdminArticle(articleId, payload);
         setStatus(updated.status);
-        setMessage(
+        showMessage(
           nextStatus === "draft"
             ? "Draft saved."
             : `Article saved as ${updated.status}.`,
         );
       } else {
         const created = await createAdminArticle(payload);
-        setMessage("Article created.");
+        showMessage("Article created.");
         router.replace(`/admin/articles/edit/?id=${created.id}`);
       }
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to save article.");
+      showError(
+        err instanceof ApiError ? err.message : "Unable to save article.",
+      );
     } finally {
       setSaving(false);
     }
@@ -320,18 +377,28 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       await save("published");
       return;
     }
+
+    const payload = buildPayload("draft");
+    const validationError = validatePayload(payload);
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
-      await updateAdminArticle(articleId, buildPayload("draft"));
+      // Save content first, then flip status via /publish so published_at is set.
+      await updateAdminArticle(articleId, payload);
       await publishAdminArticle(
         articleId,
         fromDatetimeLocalValue(publishedAtLocal) || undefined,
       );
       setStatus("published");
-      setMessage("Article published.");
+      showMessage("Article published.");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Publish failed.");
+      showError(err instanceof ApiError ? err.message : "Publish failed.");
     } finally {
       setSaving(false);
     }
@@ -340,22 +407,31 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   async function scheduleNow() {
     const scheduledAt = fromDatetimeLocalValue(scheduledAtLocal);
     if (!scheduledAt) {
-      setError("Choose a schedule date before scheduling.");
+      showError("Choose a schedule date before scheduling.");
       return;
     }
     if (!isEdit || !articleId) {
       await save("scheduled");
       return;
     }
+
+    const payload = buildPayload("draft");
+    const validationError = validatePayload(payload);
+    if (validationError) {
+      showError(validationError);
+      return;
+    }
+
     setSaving(true);
     setError(null);
+    setMessage(null);
     try {
-      await updateAdminArticle(articleId, buildPayload("draft"));
+      await updateAdminArticle(articleId, payload);
       await scheduleAdminArticle(articleId, scheduledAt);
       setStatus("scheduled");
-      setMessage("Article scheduled.");
+      showMessage("Article scheduled.");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Schedule failed.");
+      showError(err instanceof ApiError ? err.message : "Schedule failed.");
     } finally {
       setSaving(false);
     }
@@ -369,7 +445,6 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
     try {
       assertImageWithinLimit(file);
       const uploaded = await uploadAdminMedia(file);
-      setMedia((current) => [uploaded, ...current]);
       setFeaturedImageId(uploaded.id);
       setFeaturedImageUrl(uploaded.fileUrl);
       setMessage("Image uploaded and selected.");
@@ -651,65 +726,6 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 </div>
               )}
             </div>
-            <div className="admin-media-grid" style={{ marginTop: 14 }}>
-              {media.map((item) => {
-                const selected = featuredImageId === item.id;
-                return (
-                  <div
-                    key={item.id}
-                    className={`admin-media-item ${selected ? "is-selected" : ""}`}
-                  >
-                    <button
-                      type="button"
-                      className="admin-media-select"
-                      onClick={() => {
-                        setFeaturedImageId(item.id);
-                        setFeaturedImageUrl(item.fileUrl);
-                      }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={item.fileUrl}
-                        alt={item.originalFilename || ""}
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-image-remove"
-                      aria-label="Remove image"
-                      title="Remove image"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        void (async () => {
-                          try {
-                            await deleteAdminMedia(item.id);
-                            setMedia((current) =>
-                              current.filter((entry) => entry.id !== item.id),
-                            );
-                            if (featuredImageId === item.id) {
-                              setFeaturedImageId(null);
-                              setFeaturedImageUrl(null);
-                            }
-                            setMessage("Image removed.");
-                            setError(null);
-                          } catch (err) {
-                            setError(
-                              err instanceof ApiError
-                                ? err.message
-                                : "Could not remove image.",
-                            );
-                          }
-                        })();
-                      }}
-                    >
-                      ×
-                    </button>
-                    <div className="admin-media-meta">#{item.id}</div>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
           <div className="admin-tabs">
@@ -749,11 +765,19 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
               <input
                 className="admin-field"
                 value={active.slug}
-                onChange={(event) =>
-                  updateTranslation({ slug: slugify(event.target.value) })
-                }
+                onChange={(event) => {
+                  setSlugLocked((current) => ({
+                    ...current,
+                    [langTab]: true,
+                  }));
+                  updateTranslation({ slug: slugify(event.target.value) });
+                }}
                 required
               />
+              <p className="admin-muted" style={{ marginTop: 6 }}>
+                Auto-generated from the headline; edit anytime. Hindi headlines
+                may need a romanized slug.
+              </p>
             </div>
             <div style={{ gridColumn: "1 / -1" }}>
               <label className="admin-label">Summary</label>
@@ -806,26 +830,85 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 }
               />
             </div>
-            <div>
-              <label className="admin-label">SEO title</label>
-              <input
-                className="admin-field"
-                value={active.seoTitle || ""}
-                onChange={(event) =>
-                  updateTranslation({ seoTitle: event.target.value })
-                }
-              />
+          </div>
+
+          <div className="admin-card admin-card-pad admin-seo-section">
+            <div className="admin-seo-head">
+              <div>
+                <strong>
+                  Search engine settings (Optional)
+                  {langTab === "hi" ? " · Hindi" : " · English"}
+                </strong>
+                <p className="admin-muted" style={{ margin: "6px 0 0" }}>
+                  Empty fields use this language&apos;s headline and summary.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="admin-btn"
+                aria-expanded={seoOpen}
+                onClick={() => setSeoOpen((open) => !open)}
+              >
+                {seoOpen ? "Hide SEO settings" : "Customize SEO settings"}
+              </button>
             </div>
-            <div>
-              <label className="admin-label">SEO description</label>
-              <input
-                className="admin-field"
-                value={active.seoDescription || ""}
-                onChange={(event) =>
-                  updateTranslation({ seoDescription: event.target.value })
-                }
-              />
+
+            <div
+              className="admin-serp-preview"
+              aria-label="Search result preview"
+            >
+              <div className="admin-serp-card admin-serp-card-compact">
+                <div className="admin-serp-url">{serpUrl}</div>
+                <div className="admin-serp-title">
+                  {serpTitle || "Article title"}
+                </div>
+                <div className="admin-serp-desc">
+                  {serpDescription ||
+                    "Add a summary or SEO description to preview the snippet."}
+                </div>
+              </div>
             </div>
+
+            {seoOpen ? (
+              <div className="admin-form-grid two" style={{ marginTop: 14 }}>
+                <div>
+                  <label className="admin-label" htmlFor={`seo-title-${langTab}`}>
+                    SEO title
+                  </label>
+                  <input
+                    id={`seo-title-${langTab}`}
+                    className="admin-field"
+                    value={active.seoTitle || ""}
+                    placeholder={
+                      active.title || "Uses article headline when empty"
+                    }
+                    onChange={(event) =>
+                      updateTranslation({ seoTitle: event.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <label
+                    className="admin-label"
+                    htmlFor={`seo-description-${langTab}`}
+                  >
+                    SEO description
+                  </label>
+                  <textarea
+                    id={`seo-description-${langTab}`}
+                    className="admin-textarea"
+                    rows={3}
+                    value={active.seoDescription || ""}
+                    placeholder={
+                      active.summary || "Uses article summary when empty"
+                    }
+                    onChange={(event) =>
+                      updateTranslation({ seoDescription: event.target.value })
+                    }
+                  />
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="admin-card admin-card-pad">
@@ -906,6 +989,13 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div ref={feedbackRef}>
+            {error ? <div className="admin-alert error">{error}</div> : null}
+            {message ? (
+              <div className="admin-alert success">{message}</div>
+            ) : null}
           </div>
 
           <div className="admin-actions">

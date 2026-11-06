@@ -58,7 +58,7 @@ export function TermsContent() {
   return (
     <InfoLayout title={t("terms.title")} lede={t("terms.lede")}>
       <p>{t("terms.p1")}</p>
-      <h2>{t("terms.h2Sample")}</h2>
+      <h2>{t("terms.h2Content")}</h2>
       <p>{t("terms.p2")}</p>
       <p>{t("terms.p3")}</p>
     </InfoLayout>
@@ -76,6 +76,17 @@ export function EditorialContent() {
       <p>{t("editorial.p3")}</p>
       <h2>{t("editorial.h2Health")}</h2>
       <p>{t("editorial.p4")}</p>
+    </InfoLayout>
+  );
+}
+
+export function DisclaimerContent() {
+  const t = useT();
+  return (
+    <InfoLayout title={t("disclaimer.title")} lede={t("disclaimer.lede")}>
+      <p>{t("disclaimer.p1")}</p>
+      <p>{t("disclaimer.p2")}</p>
+      <p>{t("disclaimer.p3")}</p>
     </InfoLayout>
   );
 }

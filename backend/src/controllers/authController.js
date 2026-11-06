@@ -21,16 +21,21 @@ const loginLimiter = rateLimit({
 const login = asyncHandler(async (req, res) => {
   const result = await authService.login(req.body.email, req.body.password);
   res.cookie(env.COOKIE_NAME, result.token, authService.cookieOptions());
-  return ok(res, result);
+  // Never return the JWT in the JSON body — HttpOnly cookie only.
+  return ok(res, { user: result.user });
 });
 
 const logout = asyncHandler(async (_req, res) => {
-  res.clearCookie(env.COOKIE_NAME, {
+  const clearOptions = {
     httpOnly: true,
     secure: env.isProduction,
     sameSite: env.isProduction ? "strict" : "lax",
     path: "/",
-  });
+  };
+  if (env.COOKIE_DOMAIN) {
+    clearOptions.domain = env.COOKIE_DOMAIN;
+  }
+  res.clearCookie(env.COOKIE_NAME, clearOptions);
   return ok(res, { loggedOut: true });
 });
 

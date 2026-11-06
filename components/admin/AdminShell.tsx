@@ -134,11 +134,10 @@ export function AdminShell({
           <div className="admin-sidebar-foot">
             <p>{user.name}</p>
             <small>{user.email}</small>
-            <div className="admin-actions" style={{ marginTop: 12 }}>
+            <div className="admin-actions">
               <button
                 type="button"
-                className="admin-btn admin-btn-ghost"
-                style={{ color: "#fff", borderColor: "rgba(255,255,255,0.2)" }}
+                className="admin-btn admin-btn-sm admin-btn-ghost"
                 onClick={() => void logout().then(() => router.replace("/admin/login/"))}
               >
                 Log out

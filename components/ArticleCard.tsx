@@ -79,7 +79,6 @@ export function ArticleCard({
         <div>
           <p className="kicker">
             <Link href={categoryHref}>{name}</Link>
-            <span className="sample-tag">{t("label.sample")}</span>
           </p>
           <Title>
             <Link href={href}>{article.title}</Link>
@@ -142,7 +141,6 @@ export function ArticleCard({
       <div className="card-body">
         <p className="kicker">
           <Link href={categoryHref}>{name}</Link>
-          <span className="sample-tag">{t("label.sample")}</span>
         </p>
         <Title className="card-title">
           <Link href={href}>{article.title}</Link>

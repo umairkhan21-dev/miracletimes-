@@ -29,10 +29,8 @@ export const en: Messages = {
 
   "brand.tagline": "Voice of the people, for the people",
   "brand.edition": "Lucknow edition",
-  "brand.sampleBanner":
-    "Sample edition — stories here are written for demonstration. Do not treat them as verified or live news.",
   "brand.footerAbout":
-    "Miracle Times is a Hindi newspaper focused on Uttar Pradesh and Lucknow, covering national affairs, politics, business, and everyday news. Stories in this edition are sample content.",
+    "Miracle Times is a Hindi newspaper focused on Uttar Pradesh and Lucknow, covering national affairs, politics, business, and everyday news.",
   "brand.copyright": "© {year} Miracle Times. All rights reserved.",
   "brand.location": "Lucknow, Uttar Pradesh",
 
@@ -42,15 +40,15 @@ export const en: Messages = {
   "footer.about": "About us",
   "footer.contact": "Contact us",
   "footer.privacy": "Privacy policy",
-  "footer.terms": "Terms and conditions",
+  "footer.terms": "Terms & conditions",
   "footer.editorial": "Editorial policy",
+  "footer.disclaimer": "Disclaimer",
   "footer.corrections": "Corrections policy",
 
   "ticker.breaking": "Breaking News",
   "ticker.pause": "Pause",
   "ticker.play": "Play",
 
-  "label.sample": "Sample",
   "label.published": "Published",
   "label.updated": "Updated",
   "label.today": "Today",
@@ -76,17 +74,17 @@ export const en: Messages = {
 
   "trending.title": "Most read stories",
   "trending.note":
-    "This ranking is a sample. Real readership or analytics are not available, so do not treat it as proof of page views.",
+    "This ranking is set by the editorial desk.",
 
   "latest.title": "Latest news",
   "latest.description":
-    "All sample stories from newest to oldest. Use pagination to browse further.",
+    "All stories from newest to oldest. Use pagination to browse further.",
 
   "category.feedHeading": "Latest order",
   "category.loading": "Loading stories…",
   "category.emptyTitle": "No stories in this category yet",
   "category.emptyMessage":
-    "When new sample or editorial stories are added, they will appear here in order.",
+    "When new stories are published, they will appear here in order.",
   "category.goHome": "Go to home",
 
   "content.loading": "Loading stories…",
@@ -113,12 +111,10 @@ export const en: Messages = {
   "search.results": "{count} results for “{query}”",
   "search.emptyTitle": "No results found",
   "search.emptyMessage":
-    "No sample story matched “{query}”. Try another term or open a category.",
+    "No story matched “{query}”. Try another term or open a category.",
   "search.preparing": "Preparing search…",
   "search.findNews": "Search news",
 
-  "article.sampleNote":
-    "This report is sample content. Do not treat it as verified news, an official statement, or medical advice.",
   "article.allInCategory": "All stories in {name}",
   "article.prev": "Previous story",
   "article.next": "Next story",
@@ -166,10 +162,10 @@ export const en: Messages = {
     "The paper focuses on Uttar Pradesh, Lucknow, politics, national and world affairs, business, education, crime, technology, sports, entertainment, and health. The reading experience stays newspaper-like: a strong lead, clear categories, and comfortable article pages.",
   "about.h2Edition": "This edition",
   "about.p2":
-    "The stories you see now are sample content written for an editorial demo. Do not treat them as verified events, official statements, or live news. When an editorial system is connected, these same pages are ready for real reports.",
+    "Miracle Times uses these pages for published reports, analysis, and local coverage.",
   "about.h2Desk": "Desk",
   "about.p3":
-    "Sample stories are credited to the Miracle Times Desk. Fictional reporter bios have not been added.",
+    "Stories may be credited to the Miracle Times Desk or a named correspondent.",
 
   "contact.title": "Contact us",
   "contact.lede":
@@ -199,17 +195,17 @@ export const en: Messages = {
   "terms.lede": "Reading the site means you understand the limits of this edition.",
   "terms.p1":
     "Miracle Times content is for personal reading. Written permission is required before commercial republication.",
-  "terms.h2Sample": "Sample content",
+  "terms.h2Content": "Use of content",
   "terms.p2":
-    "Stories in this edition are for demonstration. Do not base travel, treatment, investment, legal steps, or exam preparation on them. Official sources should guide such decisions.",
+    "Do not base travel, treatment, investment, legal steps, or exam preparation solely on news reports. Official sources should guide such decisions.",
   "terms.p3":
     "External links, when added, remain under their own terms. Share buttons currently only copy the article address or open the device share menu.",
 
   "editorial.title": "Editorial policy",
   "editorial.lede":
-    "Readers should clearly see what is a verified report and what is sample text.",
+    "Readers should clearly see the source and context behind each report.",
   "editorial.p1":
-    "In this edition every story carries a sample mark, and the article opening states that it should not be treated as verified news. Headlines do not invent quotations from real people.",
+    "Headlines and reporting stay grounded in facts. Unsourced quotations or accusations are not published.",
   "editorial.h2Photos": "Photographs",
   "editorial.p2":
     "Photographs are symbolic. Captions say the same. Do not treat any image as documentary evidence from a scene.",
@@ -220,6 +216,16 @@ export const en: Messages = {
   "editorial.p4":
     "Health articles are not medical advice. The crime section stays limited to awareness and does not accuse any person.",
 
+  "disclaimer.title": "Disclaimer",
+  "disclaimer.lede":
+    "Miracle Times content is published for general information.",
+  "disclaimer.p1":
+    "Articles, headlines, and photographs are published through the editorial process. Symbolic photographs are noted in captions.",
+  "disclaimer.p2":
+    "Do not treat news reports as medical advice or legal guidance. Captions mark symbolic photographs where used.",
+  "disclaimer.p3":
+    "For privacy, terms, corrections, and editorial standards, use the linked policies in the site footer.",
+
   "corrections.title": "Corrections policy",
   "corrections.lede":
     "If a fact is wrong, a correction should be recorded and readers should see what changed.",
@@ -227,32 +233,32 @@ export const en: Messages = {
     "When a live editorial system is connected, important corrections will appear on the article with an update time. Clarifications stay with the story and are not quietly deleted.",
   "corrections.h2Write": "How to write now",
   "corrections.p2Before":
-    "Stories in this demo are samples, but you can still write about a passage to",
+    "You can write about a passage to",
   "corrections.p2After": ". Include the story title in the subject line.",
   "corrections.p3":
     "In the message, say which sentence seemed wrong and what the correct source is.",
 
   "catDesc.uttar-pradesh":
-    "Sample reports on cities, towns, farming, and public services across Uttar Pradesh. These stories show the publication format.",
+    "Reports on cities, towns, farming, and public services across Uttar Pradesh.",
   "catDesc.lucknow":
-    "Sample stories focused on Lucknow traffic, markets, the station, and city services.",
+    "Stories focused on Lucknow traffic, markets, the station, and city services.",
   "catDesc.politics":
     "Fictional editorial bulletins on the assembly, local bodies, and civic processes. They do not claim any real statement.",
   "catDesc.national":
-    "Sample coverage of national topics such as rail, energy, and education.",
+    "Coverage of national topics such as rail, energy, and education.",
   "catDesc.world":
-    "Brief sample stories on international topics such as trade and climate.",
+    "Brief stories on international topics such as trade and climate.",
   "catDesc.business":
-    "Sample economic reports on small industry, mandis, and local business.",
+    "Economic reports on small industry, mandis, and local business.",
   "catDesc.education":
-    "Sample education notices about exams, scholarships, and libraries.",
+    "Education notices about exams, scholarships, and libraries.",
   "catDesc.crime":
-    "Awareness-based sample reports on cyber caution and traffic checks. No person is accused.",
+    "Awareness-based reports on cyber caution and traffic checks. No person is accused.",
   "catDesc.technology":
-    "Simple sample explainers on digital services and civic technology.",
-  "catDesc.sports": "Sample sports stories on local cricket and sports camps.",
+    "Simple explainers on digital services and civic technology.",
+  "catDesc.sports": "Sports stories on local cricket and sports camps.",
   "catDesc.entertainment":
-    "Sample cultural stories on theatre, folk song, and community events.",
+    "Cultural stories on theatre, folk song, and community events.",
   "catDesc.health":
-    "Sample information on health camps and general caution. This is not medical advice.",
+    "Information on health camps and general caution. This is not medical advice.",
 };

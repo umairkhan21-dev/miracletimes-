@@ -11,6 +11,7 @@ export default function AdminLoginPage() {
   const { status, isAdmin, login } = useAdminAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -83,15 +84,26 @@ export default function AdminLoginPage() {
               <label className="admin-label" htmlFor="admin-password">
                 Password
               </label>
-              <input
-                id="admin-password"
-                className="admin-field"
-                type="password"
-                autoComplete="current-password"
-                required
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-              />
+              <div className="admin-password-field">
+                <input
+                  id="admin-password"
+                  className="admin-field"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="admin-password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-pressed={showPassword}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
             </div>
             <button
               className="admin-btn admin-btn-primary"

@@ -32,7 +32,7 @@ function sanitize(value) {
   if (!value || typeof value !== "object") return value;
   const clone = { ...value };
   for (const key of Object.keys(clone)) {
-    if (/password|token|secret|authorization|cookie/i.test(key)) {
+    if (/password|token|secret|authorization|cookie|hook|deploy/i.test(key)) {
       clone[key] = "[redacted]";
     }
   }

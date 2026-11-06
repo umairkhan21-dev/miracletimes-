@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:export": "node scripts/static-export-build.mjs",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:seo": "node --test scripts/verify-seo.mjs scripts/patch-html-lang.test.mjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6",

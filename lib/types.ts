@@ -19,7 +19,12 @@ export type Article = {
   featured?: boolean;
   breaking?: boolean;
   tags?: string[];
-  /** Sample ordering only. This is not a measured readership count. */
+  language?: "hi" | "en" | string;
+  /** Optional per-language SEO title; fall back to title when empty. */
+  seoTitle?: string;
+  /** Optional per-language SEO description; fall back to summary when empty. */
+  seoDescription?: string;
+  /** Editorial ranking order for the most-read list. */
   demoRank?: number;
 };
 

@@ -3,10 +3,16 @@ const jwt = require("jsonwebtoken");
 const { env } = require("../config/env");
 const { query } = require("../config/database");
 const { AppError } = require("../utils/AppError");
+const { parseJwtExpiresInMs } = require("../utils/expiresIn");
 
 const PUBLIC_USER_FIELDS = "id, name, email, role, is_active, created_at, updated_at";
 
 function signToken(user) {
+  // Pass seconds so lifetime matches cookie maxAge for all supported formats
+  // (including digit-only env values treated as seconds).
+  const expiresInSeconds = Math.floor(
+    parseJwtExpiresInMs(env.JWT_EXPIRES_IN) / 1000,
+  );
   return jwt.sign(
     {
       sub: user.id,
@@ -14,7 +20,7 @@ function signToken(user) {
       email: user.email,
     },
     env.JWT_SECRET,
-    { expiresIn: env.JWT_EXPIRES_IN },
+    { expiresIn: expiresInSeconds },
   );
 }
 
@@ -75,13 +81,18 @@ async function login(email, password) {
 }
 
 function cookieOptions() {
-  return {
+  /** @type {import('express').CookieOptions} */
+  const options = {
     httpOnly: true,
     secure: env.isProduction,
     sameSite: env.isProduction ? "strict" : "lax",
-    maxAge: 24 * 60 * 60 * 1000,
+    maxAge: parseJwtExpiresInMs(env.JWT_EXPIRES_IN),
     path: "/",
   };
+  if (env.COOKIE_DOMAIN) {
+    options.domain = env.COOKIE_DOMAIN;
+  }
+  return options;
 }
 
 module.exports = {
@@ -91,4 +102,5 @@ module.exports = {
   login,
   toPublicUser,
   cookieOptions,
+  parseJwtExpiresInMs,
 };

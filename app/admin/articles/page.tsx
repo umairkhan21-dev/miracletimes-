@@ -101,15 +101,13 @@ export default function AdminArticlesPage() {
 
       <form className="admin-toolbar" onSubmit={onSearch}>
         <input
-          className="admin-field"
-          style={{ maxWidth: 280 }}
+          className="admin-field admin-toolbar-search"
           placeholder="Search title, slug, or keyword"
           value={q}
           onChange={(event) => setQ(event.target.value)}
         />
         <select
-          className="admin-select"
-          style={{ maxWidth: 180 }}
+          className="admin-select admin-toolbar-status"
           value={status}
           onChange={(event) => {
             setPage(1);
@@ -123,8 +121,7 @@ export default function AdminArticlesPage() {
           ))}
         </select>
         <select
-          className="admin-select"
-          style={{ maxWidth: 160 }}
+          className="admin-select admin-toolbar-language"
           value={language}
           onChange={(event) => {
             setPage(1);
@@ -164,7 +161,7 @@ export default function AdminArticlesPage() {
                   const previewSlug = article.slug;
                   return (
                     <tr key={`${article.id}-${article.language}-${article.slug}`}>
-                      <td>
+                      <td className="admin-table-title">
                         <strong>{article.title}</strong>
                         <div className="admin-muted">{article.slug}</div>
                       </td>
@@ -176,16 +173,25 @@ export default function AdminArticlesPage() {
                         </span>
                       </td>
                       <td>{article.author}</td>
-                      <td>
+                      <td className="admin-table-date">
                         {article.publishedAt
-                          ? new Date(article.publishedAt).toLocaleString()
+                          ? new Date(article.publishedAt).toLocaleString(
+                              "en-IN",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              },
+                            )
                           : "—"}
                       </td>
-                      <td>
+                      <td className="admin-table-actions">
                         <div className="admin-row-actions">
                           {id ? (
                             <Link
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               href={`/admin/articles/edit/?id=${id}`}
                             >
                               Edit
@@ -193,7 +199,7 @@ export default function AdminArticlesPage() {
                           ) : null}
                           {previewSlug ? (
                             <a
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               href={`/news/${previewSlug}/`}
                               target="_blank"
                               rel="noreferrer"
@@ -204,7 +210,7 @@ export default function AdminArticlesPage() {
                           {id && article.status !== "published" ? (
                             <button
                               type="button"
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               disabled={busyId === id}
                               onClick={() => {
                                 if (!confirm("Publish this article now?")) return;
@@ -221,7 +227,7 @@ export default function AdminArticlesPage() {
                           {id && article.status === "published" ? (
                             <button
                               type="button"
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               disabled={busyId === id}
                               onClick={() => {
                                 if (!confirm("Move this article back to draft?")) return;
@@ -238,7 +244,7 @@ export default function AdminArticlesPage() {
                           {id && article.status !== "scheduled" ? (
                             <button
                               type="button"
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               disabled={busyId === id}
                               onClick={() => {
                                 const value = window.prompt(
@@ -258,7 +264,7 @@ export default function AdminArticlesPage() {
                           {id && article.status !== "archived" ? (
                             <button
                               type="button"
-                              className="admin-btn"
+                              className="admin-btn admin-btn-sm"
                               disabled={busyId === id}
                               onClick={() => {
                                 if (!confirm("Archive this article?")) return;
@@ -275,7 +281,7 @@ export default function AdminArticlesPage() {
                           {id ? (
                             <button
                               type="button"
-                              className="admin-btn admin-btn-danger"
+                              className="admin-btn admin-btn-sm admin-btn-danger"
                               disabled={busyId === id}
                               onClick={() => {
                                 if (
@@ -306,10 +312,10 @@ export default function AdminArticlesPage() {
         )}
       </div>
 
-      <div className="admin-actions" style={{ marginTop: 16 }}>
+      <div className="admin-pagination">
         <button
           type="button"
-          className="admin-btn"
+          className="admin-btn admin-btn-sm"
           disabled={page <= 1 || loading}
           onClick={() => setPage((value) => Math.max(1, value - 1))}
         >
@@ -320,7 +326,7 @@ export default function AdminArticlesPage() {
         </span>
         <button
           type="button"
-          className="admin-btn"
+          className="admin-btn admin-btn-sm"
           disabled={page >= totalPages || loading}
           onClick={() => setPage((value) => value + 1)}
         >

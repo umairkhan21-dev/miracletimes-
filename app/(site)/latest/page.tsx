@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "ताज़ा खबरें",
-  description: "मिरेकल टाइम्स की नमूना खबरें समय के क्रम में।",
+  description: "मिरेकल टाइम्स की ताज़ा खबरें समय के क्रम में।",
   alternates: { canonical: "/latest/" },
 };
 

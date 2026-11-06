@@ -10,7 +10,7 @@ export const categories: Category[] = [
     english: "Uttar Pradesh",
     href: demoPath("/category/uttar-pradesh"),
     description:
-      "उत्तर प्रदेश के शहरों, कस्बों, खेती और जनसुविधाओं पर नमूना रिपोर्ट। ये कहानियाँ प्रकाशन का प्रारूप दिखाती हैं।",
+      "उत्तर प्रदेश के शहरों, कस्बों, खेती और जनसुविधाओं पर रिपोर्ट। ये कहानियाँ प्रकाशन का प्रारूप दिखाती हैं।",
   },
   {
     slug: "lucknow",
@@ -18,7 +18,7 @@ export const categories: Category[] = [
     english: "Lucknow",
     href: demoPath("/category/lucknow"),
     description:
-      "लखनऊ की यातायात, बाजार, स्टेशन और शहर की सुविधाओं पर केंद्रित नमूना खबरें।",
+      "लखनऊ की यातायात, बाजार, स्टेशन और शहर की सुविधाओं पर केंद्रित खबरें।",
   },
   {
     slug: "politics",
@@ -33,28 +33,28 @@ export const categories: Category[] = [
     name: "देश",
     english: "National",
     href: demoPath("/category/national"),
-    description: "रेल, ऊर्जा और शिक्षा जैसे राष्ट्रीय विषयों पर नमूना कवरेज।",
+    description: "रेल, ऊर्जा और शिक्षा जैसे राष्ट्रीय विषयों पर कवरेज।",
   },
   {
     slug: "world",
     name: "दुनिया",
     english: "World",
     href: demoPath("/category/world"),
-    description: "व्यापार और जलवायु जैसे अंतरराष्ट्रीय विषयों की संक्षिप्त नमूना खबरें।",
+    description: "व्यापार और जलवायु जैसे अंतरराष्ट्रीय विषयों की संक्षिप्त खबरें।",
   },
   {
     slug: "business",
     name: "कारोबार",
     english: "Business",
     href: demoPath("/category/business"),
-    description: "लघु उद्योग, मंडी और स्थानीय कारोबार पर नमूना आर्थिक रिपोर्ट।",
+    description: "लघु उद्योग, मंडी और स्थानीय कारोबार पर आर्थिक रिपोर्ट।",
   },
   {
     slug: "education",
     name: "शिक्षा",
     english: "Education",
     href: demoPath("/category/education"),
-    description: "परीक्षा, छात्रवृत्ति और पुस्तकालयों से जुड़ी नमूना शैक्षणिक सूचनाएँ।",
+    description: "परीक्षा, छात्रवृत्ति और पुस्तकालयों से जुड़ी शैक्षणिक सूचनाएँ।",
   },
   {
     slug: "crime",
@@ -62,28 +62,28 @@ export const categories: Category[] = [
     english: "Crime",
     href: demoPath("/category/crime"),
     description:
-      "साइबर सावधानी और यातायात जांच पर जागरूकता आधारित नमूना रिपोर्ट। इनमें किसी व्यक्ति पर आरोप नहीं लगाया गया है।",
+      "साइबर सावधानी और यातायात जांच पर जागरूकता आधारित रिपोर्ट। इनमें किसी व्यक्ति पर आरोप नहीं लगाया गया है।",
   },
   {
     slug: "technology",
     name: "टेक्नोलॉजी",
     english: "Technology",
     href: demoPath("/category/technology"),
-    description: "डिजिटल सेवाओं और नागरिक तकनीक पर सरल नमूना व्याख्या।",
+    description: "डिजिटल सेवाओं और नागरिक तकनीक पर सरल व्याख्या।",
   },
   {
     slug: "sports",
     name: "खेल",
     english: "Sports",
     href: demoPath("/category/sports"),
-    description: "स्थानीय क्रिकेट और खेल शिविरों की नमूना खेल खबरें।",
+    description: "स्थानीय क्रिकेट और खेल शिविरों की खेल खबरें।",
   },
   {
     slug: "entertainment",
     name: "मनोरंजन",
     english: "Entertainment",
     href: demoPath("/category/entertainment"),
-    description: "रंगमंच, लोकगीत और सामुदायिक कार्यक्रमों की नमूना सांस्कृतिक खबरें।",
+    description: "रंगमंच, लोकगीत और सामुदायिक कार्यक्रमों की सांस्कृतिक खबरें।",
   },
   {
     slug: "health",
@@ -91,7 +91,7 @@ export const categories: Category[] = [
     english: "Health",
     href: demoPath("/category/health"),
     description:
-      "स्वास्थ्य शिविरों और सामान्य सावधानी की नमूना जानकारी। यह चिकित्सकीय सलाह नहीं है।",
+      "स्वास्थ्य शिविरों और सामान्य सावधानी की जानकारी। यह चिकित्सकीय सलाह नहीं है।",
   },
 ];
 
@@ -111,6 +111,7 @@ export type InfoLinkKey =
   | "footer.privacy"
   | "footer.terms"
   | "footer.editorial"
+  | "footer.disclaimer"
   | "footer.corrections";
 
 export const infoLinks: Array<InfoLink & { labelKey: InfoLinkKey }> = [
@@ -122,6 +123,11 @@ export const infoLinks: Array<InfoLink & { labelKey: InfoLinkKey }> = [
     href: demoPath("/editorial-policy"),
     label: "संपादकीय नीति",
     labelKey: "footer.editorial",
+  },
+  {
+    href: demoPath("/disclaimer"),
+    label: "अस्वीकरण",
+    labelKey: "footer.disclaimer",
   },
   {
     href: demoPath("/corrections"),

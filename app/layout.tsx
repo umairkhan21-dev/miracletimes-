@@ -22,7 +22,9 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="hi">
+    // suppressHydrationWarning: langBootScript may set lang/data-ui-lang from
+    // localStorage before React hydrates (server always defaults to hi).
+    <html lang="hi" suppressHydrationWarning>
       <body style={{ margin: 0 }}>{children}</body>
     </html>
   );

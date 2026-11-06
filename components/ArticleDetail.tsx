@@ -127,35 +127,6 @@ export function ArticleDetail({ slug }: { slug: string }) {
   const name = categoryName(article.category, locale);
   const categoryHref = demoPath(`/category/${article.category}`);
   const url = demoAbsoluteUrl(site.url, `/news/${article.slug}`);
-  const imageUrl = article.image
-    ? article.image.startsWith("http")
-      ? article.image
-      : `${site.url}${article.image}`
-    : undefined;
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "NewsArticle",
-    headline: article.title,
-    description: article.summary,
-    datePublished: article.publishedAt,
-    dateModified: article.updatedAt ?? article.publishedAt,
-    inLanguage: locale,
-    articleSection: name,
-    ...(imageUrl ? { image: [imageUrl] } : {}),
-    author: { "@type": "Organization", name: article.author },
-    publisher: {
-      "@type": "Organization",
-      name: site.name,
-      url: site.url,
-      logo: {
-        "@type": "ImageObject",
-        url: `${site.url}/mark.png`,
-      },
-    },
-    mainEntityOfPage: url,
-    isBasedOn: site.sampleNotice,
-  };
 
   return (
     <article className="wrap article-page">
@@ -169,7 +140,6 @@ export function ArticleDetail({ slug }: { slug: string }) {
       <header className="story-header">
         <p className="kicker">
           <Link href={categoryHref}>{name}</Link>
-          <span className="sample-tag">{t("label.sample")}</span>
         </p>
         <h1>{article.title}</h1>
         <p className="story-dek">{article.summary}</p>
@@ -203,8 +173,6 @@ export function ArticleDetail({ slug }: { slug: string }) {
         </div>
         {article.imageCaption ? <figcaption>{article.imageCaption}</figcaption> : null}
       </figure>
-
-      <p className="sample-note">{t("article.sampleNote")}</p>
 
       <div className="story-body">
         {article.content.map((block, index) =>
@@ -253,13 +221,6 @@ export function ArticleDetail({ slug }: { slug: string }) {
           <ArticleList articles={latest} variant="text" />
         </section>
       ) : null}
-
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c"),
-        }}
-      />
     </article>
   );
 }

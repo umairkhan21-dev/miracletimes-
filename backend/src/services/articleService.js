@@ -7,6 +7,84 @@ const PUBLISHED_WHERE = `a.status = 'published'
   AND a.published_at IS NOT NULL
   AND a.published_at <= UTC_TIMESTAMP()`;
 
+/** Roles allowed to publish, schedule, archive, or set publication fields. */
+const PUBLICATION_ROLES = new Set(["admin", "editor"]);
+
+/** Statuses authors may mutate (content or metadata). */
+const AUTHOR_EDITABLE_STATUSES = new Set(["draft"]);
+
+function canManagePublication(actor) {
+  return Boolean(actor && PUBLICATION_ROLES.has(actor.role));
+}
+
+/**
+ * Authors may create/edit draft content they own, but must not publish,
+ * schedule, archive, or set editorial publication fields via create/update.
+ */
+function assertPublicationWriteAllowed(payload, actor) {
+  if (canManagePublication(actor)) return;
+
+  const denied = [];
+  if (payload.status !== undefined && payload.status !== "draft") {
+    denied.push("status");
+  }
+  if (payload.publishedAt !== undefined && payload.publishedAt !== null) {
+    denied.push("publishedAt");
+  }
+  if (payload.scheduledAt !== undefined && payload.scheduledAt !== null) {
+    denied.push("scheduledAt");
+  }
+  if (payload.featured === true) denied.push("featured");
+  if (payload.breaking === true) denied.push("breaking");
+  if (payload.demoRank !== undefined && payload.demoRank !== null) {
+    denied.push("demoRank");
+  }
+  if (payload.authorId !== undefined) denied.push("authorId");
+
+  if (denied.length) {
+    throw new AppError(
+      "Authors cannot publish or set privileged publication fields",
+      403,
+      { code: "FORBIDDEN", details: { fields: denied } },
+    );
+  }
+}
+
+function assertAdminArticleAccess(articleRow, actor) {
+  if (!actor) {
+    throw new AppError("Authentication required", 401, { code: "UNAUTHORIZED" });
+  }
+  if (actor.role === "author") {
+    if (Number(articleRow.author_id) !== Number(actor.id)) {
+      throw new AppError("Authors can only access their own articles", 403, {
+        code: "FORBIDDEN",
+      });
+    }
+  }
+}
+
+/**
+ * Authors may only mutate articles that are still drafts (owned, checked separately).
+ * Blocks title/body/SEO/image/category and every other field once published/scheduled.
+ */
+function assertAuthorMayMutateArticle(articleRow, actor) {
+  if (!actor || actor.role !== "author") return;
+  const status = String(articleRow.status || "");
+  if (!AUTHOR_EDITABLE_STATUSES.has(status)) {
+    throw new AppError(
+      "Authors can only edit draft articles",
+      403,
+      { code: "FORBIDDEN", details: { status } },
+    );
+  }
+}
+
+function assertCanManagePublication(actor) {
+  if (!canManagePublication(actor)) {
+    throw new AppError("Insufficient permissions", 403, { code: "FORBIDDEN" });
+  }
+}
+
 function mapFrontendArticle(row, blocks = [], tags = []) {
   return {
     id: row.public_id,
@@ -220,16 +298,50 @@ async function listPublishedArticles({
 }
 
 async function getPublishedBySlug(slug, language = "hi") {
-  const rows = await query(
-    `${listSelect}
+  // Resolve by slug first so /news/{slug}/ maps to the translation that owns it.
+  // Fall back to the requested language only if the slug is shared somehow.
+  const bySlug = await query(
+    `SELECT
+      a.id, a.public_id, a.status, a.featured, a.breaking, a.demo_rank,
+      a.published_at, a.scheduled_at, a.created_at, a.updated_at,
+      t.id AS translation_id, t.language_code, t.slug, t.title, t.summary,
+      t.author_display_name, t.image_alt, t.image_caption, t.image_position,
+      t.seo_title, t.seo_description,
+      m.file_url,
+      u.name AS author_name,
+      (
+        SELECT c.slug
+        FROM article_categories ac
+        INNER JOIN categories c ON c.id = ac.category_id
+        WHERE ac.article_id = a.id
+        ORDER BY c.display_order ASC, c.id ASC
+        LIMIT 1
+      ) AS primary_category_slug,
+      (
+        SELECT GROUP_CONCAT(c.slug ORDER BY c.display_order ASC, c.id ASC SEPARATOR ',')
+        FROM article_categories ac
+        INNER JOIN categories c ON c.id = ac.category_id
+        WHERE ac.article_id = a.id
+      ) AS category_slugs,
+      (
+        SELECT GROUP_CONCAT(tg.name ORDER BY tg.name ASC SEPARATOR ',')
+        FROM article_tags atg
+        INNER JOIN tags tg ON tg.id = atg.tag_id
+        WHERE atg.article_id = a.id
+      ) AS tag_names
+     FROM articles a
+     INNER JOIN article_translations t ON t.article_id = a.id
+     LEFT JOIN media m ON m.id = a.featured_image_id
+     LEFT JOIN users u ON u.id = a.author_id
      WHERE ${PUBLISHED_WHERE} AND t.slug = :slug
+     ORDER BY CASE WHEN t.language_code = :language THEN 0 ELSE 1 END
      LIMIT 1`,
     { language, slug },
   );
-  if (!rows.length) {
+  if (!bySlug.length) {
     throw new AppError("Article not found", 404, { code: "NOT_FOUND" });
   }
-  const [article] = await hydrateArticles(rows, { includeContent: true });
+  const [article] = await hydrateArticles(bySlug, { includeContent: true });
   return article;
 }
 
@@ -355,8 +467,8 @@ async function upsertTranslations(connection, articleId, translations) {
           translation.imageAlt || "",
           translation.imageCaption || null,
           translation.imagePosition || "center",
-          translation.seoTitle || null,
-          translation.seoDescription || null,
+          String(translation.seoTitle || "").trim() || null,
+          String(translation.seoDescription || "").trim() || null,
           translationId,
         ],
       );
@@ -376,8 +488,8 @@ async function upsertTranslations(connection, articleId, translations) {
           translation.imageAlt || "",
           translation.imageCaption || null,
           translation.imagePosition || "center",
-          translation.seoTitle || null,
-          translation.seoDescription || null,
+          String(translation.seoTitle || "").trim() || null,
+          String(translation.seoDescription || "").trim() || null,
         ],
       );
       translationId = inserted.insertId;
@@ -391,6 +503,8 @@ async function upsertTranslations(connection, articleId, translations) {
 
 async function createArticle(payload, actor) {
   return withTransaction(async (connection) => {
+    assertPublicationWriteAllowed(payload, actor);
+
     const categoryIds = await resolveCategoryIds(
       connection,
       payload.categoryIds,
@@ -398,15 +512,18 @@ async function createArticle(payload, actor) {
     );
     const tagIds = await ensureTags(connection, payload.tags || []);
 
-    const status = payload.status || "draft";
-    const publishedAt =
-      status === "published"
+    const isPublisher = canManagePublication(actor);
+    const status = isPublisher ? payload.status || "draft" : "draft";
+    const publishedAt = !isPublisher
+      ? null
+      : status === "published"
         ? toMysqlDatetime(payload.publishedAt || new Date())
         : payload.publishedAt
           ? toMysqlDatetime(payload.publishedAt)
           : null;
-    const scheduledAt =
-      status === "scheduled"
+    const scheduledAt = !isPublisher
+      ? null
+      : status === "scheduled"
         ? toMysqlDatetime(payload.scheduledAt)
         : payload.scheduledAt
           ? toMysqlDatetime(payload.scheduledAt)
@@ -418,6 +535,10 @@ async function createArticle(payload, actor) {
       });
     }
 
+    const authorId = isPublisher
+      ? payload.authorId || actor.id
+      : actor.id;
+
     const [result] = await connection.execute(
       `INSERT INTO articles (
          public_id, author_id, status, featured_image_id, featured, breaking,
@@ -425,12 +546,12 @@ async function createArticle(payload, actor) {
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.publicId,
-        payload.authorId || actor.id,
+        authorId,
         status,
         payload.featuredImageId || null,
-        payload.featured ? 1 : 0,
-        payload.breaking ? 1 : 0,
-        payload.demoRank ?? null,
+        isPublisher && payload.featured ? 1 : 0,
+        isPublisher && payload.breaking ? 1 : 0,
+        isPublisher ? (payload.demoRank ?? null) : null,
         publishedAt,
         scheduledAt,
       ],
@@ -447,22 +568,18 @@ async function createArticle(payload, actor) {
 async function updateArticle(id, payload, actor) {
   return withTransaction(async (connection) => {
     const [existing] = await connection.execute(
-      "SELECT id, author_id FROM articles WHERE id = ? LIMIT 1",
+      "SELECT id, author_id, status FROM articles WHERE id = ? LIMIT 1",
       [id],
     );
     if (!existing.length) {
       throw new AppError("Article not found", 404, { code: "NOT_FOUND" });
     }
 
-    if (
-      actor.role === "author" &&
-      Number(existing[0].author_id) !== Number(actor.id)
-    ) {
-      throw new AppError("Authors can only edit their own articles", 403, {
-        code: "FORBIDDEN",
-      });
-    }
+    assertAdminArticleAccess(existing[0], actor);
+    assertAuthorMayMutateArticle(existing[0], actor);
+    assertPublicationWriteAllowed(payload, actor);
 
+    const isPublisher = canManagePublication(actor);
     const fields = [];
     const values = [];
 
@@ -470,11 +587,11 @@ async function updateArticle(id, payload, actor) {
       fields.push("public_id = ?");
       values.push(payload.publicId);
     }
-    if (payload.authorId !== undefined) {
+    if (isPublisher && payload.authorId !== undefined) {
       fields.push("author_id = ?");
       values.push(payload.authorId);
     }
-    if (payload.status !== undefined) {
+    if (isPublisher && payload.status !== undefined) {
       fields.push("status = ?");
       values.push(payload.status);
     }
@@ -482,25 +599,25 @@ async function updateArticle(id, payload, actor) {
       fields.push("featured_image_id = ?");
       values.push(payload.featuredImageId);
     }
-    if (payload.featured !== undefined) {
+    if (isPublisher && payload.featured !== undefined) {
       fields.push("featured = ?");
       values.push(payload.featured ? 1 : 0);
     }
-    if (payload.breaking !== undefined) {
+    if (isPublisher && payload.breaking !== undefined) {
       fields.push("breaking = ?");
       values.push(payload.breaking ? 1 : 0);
     }
-    if (payload.demoRank !== undefined) {
+    if (isPublisher && payload.demoRank !== undefined) {
       fields.push("demo_rank = ?");
       values.push(payload.demoRank);
     }
-    if (payload.publishedAt !== undefined) {
+    if (isPublisher && payload.publishedAt !== undefined) {
       fields.push("published_at = ?");
       values.push(
         payload.publishedAt ? toMysqlDatetime(payload.publishedAt) : null,
       );
     }
-    if (payload.scheduledAt !== undefined) {
+    if (isPublisher && payload.scheduledAt !== undefined) {
       fields.push("scheduled_at = ?");
       values.push(
         payload.scheduledAt ? toMysqlDatetime(payload.scheduledAt) : null,
@@ -537,7 +654,7 @@ async function updateArticle(id, payload, actor) {
   });
 }
 
-async function getAdminArticleById(id) {
+async function getAdminArticleById(id, actor) {
   const articles = await query(
     `SELECT a.*, m.file_url, u.name AS author_name, u.email AS author_email
      FROM articles a
@@ -552,6 +669,9 @@ async function getAdminArticleById(id) {
   }
 
   const article = articles[0];
+  if (actor) {
+    assertAdminArticleAccess(article, actor);
+  }
   const translations = await query(
     `SELECT * FROM article_translations WHERE article_id = ? ORDER BY language_code`,
     [id],
@@ -599,8 +719,8 @@ async function getAdminArticleById(id) {
       imageAlt: item.image_alt,
       imageCaption: item.image_caption,
       imagePosition: item.image_position,
-      seoTitle: item.seo_title,
-      seoDescription: item.seo_description,
+      seoTitle: item.seo_title ? String(item.seo_title) : "",
+      seoDescription: item.seo_description ? String(item.seo_description) : "",
       content: (blocksMap.get(Number(item.id)) || []).map((block) => ({
         type: block.block_type,
         text: block.content,
@@ -615,10 +735,16 @@ async function listAdminArticles({
   status,
   language = "hi",
   search,
+  actor,
 } = {}) {
   const pagination = parsePagination({ page, limit });
   const where = ["1=1"];
   const params = { language };
+
+  if (actor?.role === "author") {
+    where.push("a.author_id = :ownerId");
+    params.ownerId = Number(actor.id);
+  }
 
   if (status) {
     where.push("a.status = :status");
@@ -658,14 +784,19 @@ async function listAdminArticles({
   };
 }
 
-async function setStatus(id, status, extra = {}) {
+async function setStatus(id, status, extra = {}, actor = null) {
   return withTransaction(async (connection) => {
     const [existing] = await connection.execute(
-      "SELECT id, status FROM articles WHERE id = ? LIMIT 1",
+      "SELECT id, status, author_id FROM articles WHERE id = ? LIMIT 1",
       [id],
     );
     if (!existing.length) {
       throw new AppError("Article not found", 404, { code: "NOT_FOUND" });
+    }
+
+    // Defense in depth: publication transitions are admin/editor only.
+    if (actor) {
+      assertCanManagePublication(actor);
     }
 
     if (status === "published") {
@@ -714,19 +845,16 @@ async function setStatus(id, status, extra = {}) {
 async function deleteArticle(id, actor) {
   return withTransaction(async (connection) => {
     const [existing] = await connection.execute(
-      "SELECT id, author_id FROM articles WHERE id = ? LIMIT 1",
+      "SELECT id, author_id, status FROM articles WHERE id = ? LIMIT 1",
       [id],
     );
     if (!existing.length) {
       throw new AppError("Article not found", 404, { code: "NOT_FOUND" });
     }
-    if (
-      actor.role === "author" &&
-      Number(existing[0].author_id) !== Number(actor.id)
-    ) {
-      throw new AppError("Authors can only delete their own articles", 403, {
-        code: "FORBIDDEN",
-      });
+    if (!canManagePublication(actor)) {
+      // Authors are not granted delete on any status via routes today; keep
+      // service-layer denial so alternate callers cannot remove public pages.
+      throw new AppError("Insufficient permissions", 403, { code: "FORBIDDEN" });
     }
     await connection.execute("DELETE FROM articles WHERE id = ?", [id]);
     return true;
@@ -772,4 +900,6 @@ module.exports = {
   deleteArticle,
   publishDueScheduledArticles,
   mapFrontendArticle,
+  canManagePublication,
+  AUTHOR_EDITABLE_STATUSES,
 };

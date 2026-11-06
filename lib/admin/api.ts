@@ -20,13 +20,6 @@ type ApiFailure = {
   error?: { code?: string; message?: string; details?: unknown };
 };
 
-/** In-memory only — never written to localStorage/sessionStorage. */
-let memoryBearerToken: string | null = null;
-
-export function setAdminBearerToken(token: string | null) {
-  memoryBearerToken = token;
-}
-
 async function parseJson(response: Response) {
   try {
     return (await response.json()) as ApiSuccess<unknown> | ApiFailure;
@@ -47,9 +40,6 @@ async function adminRequest<T>(
       : {}),
     ...((init.headers as Record<string, string> | undefined) ?? {}),
   };
-  if (memoryBearerToken) {
-    headers.Authorization = `Bearer ${memoryBearerToken}`;
-  }
 
   let response: Response;
   try {
@@ -93,26 +83,17 @@ function buildQuery(
 }
 
 export async function adminLogin(email: string, password: string) {
-  const { data } = await adminRequest<{ token: string; user: AdminUser }>(
-    "/auth/login",
-    {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    },
-  );
-  // Cookie is primary; keep bearer in memory only for same-tab resilience.
-  setAdminBearerToken(data.token || null);
+  const { data } = await adminRequest<{ user: AdminUser }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
   return data;
 }
 
 export async function adminLogout() {
-  try {
-    await adminRequest<{ loggedOut: boolean }>("/auth/logout", {
-      method: "POST",
-    });
-  } finally {
-    setAdminBearerToken(null);
-  }
+  await adminRequest<{ loggedOut: boolean }>("/auth/logout", {
+    method: "POST",
+  });
 }
 
 export async function adminMe() {

@@ -54,9 +54,6 @@ export function MastheadSearch() {
           autoComplete="off"
           enterKeyHint="search"
         />
-        <button type="submit" className="icon-btn" aria-label={t("a11y.searchSubmit")}>
-          <SearchIcon />
-        </button>
       </form>
     </div>
   );

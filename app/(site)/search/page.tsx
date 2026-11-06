@@ -5,7 +5,7 @@ import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "खोज",
-  description: "मिरेकल टाइम्स की नमूना खबरों में हिंदी या अंग्रेज़ी खोज।",
+  description: "मिरेकल टाइम्स की खबरों में हिंदी या अंग्रेज़ी खोज।",
   robots: { index: false, follow: true },
   alternates: { canonical: "/search/" },
 };

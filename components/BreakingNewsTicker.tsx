@@ -16,6 +16,7 @@ export function BreakingNewsTicker({ items }: { items: TickerItem[] }) {
 
   if (!items.length) return null;
 
+  // Duplicate the group so the CSS marquee can loop seamlessly (translateX -50%).
   const group = (hidden = false) => (
     <div className="ticker-group" aria-hidden={hidden || undefined}>
       {items.map((item) => (
@@ -24,7 +25,6 @@ export function BreakingNewsTicker({ items }: { items: TickerItem[] }) {
           href={demoPath(`/news/${item.slug}`)}
           className="ticker-item"
         >
-          <span className="sample-tag">{t("label.sample")}</span>
           {item.title}
         </Link>
       ))}

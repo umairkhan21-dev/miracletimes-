@@ -22,13 +22,20 @@ async function start() {
   }
 
   const app = createApp();
-  const server = app.listen(env.PORT, () => {
+  // Empty LISTEN_HOST keeps Node's default (all interfaces) for PaaS/containers
+  // that require 0.0.0.0. Set LISTEN_HOST=127.0.0.1 behind a VPS reverse proxy.
+  const listenHost = env.LISTEN_HOST || undefined;
+  const onListening = () => {
     logger.info(`Miracle Times API listening on port ${env.PORT}`, {
       env: env.NODE_ENV,
+      host: listenHost || "(all interfaces)",
       frontend: env.FRONTEND_URL,
     });
     startScheduledPublisher(env.SCHEDULE_INTERVAL_MS);
-  });
+  };
+  const server = listenHost
+    ? app.listen(env.PORT, listenHost, onListening)
+    : app.listen(env.PORT, onListening);
 
   let shuttingDown = false;
 

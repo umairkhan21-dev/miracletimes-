@@ -29,7 +29,6 @@ export function LeadStory({ article }: { article: Article }) {
       <div className="lead-copy">
         <p className="kicker">
           <Link href={demoPath(`/category/${article.category}`)}>{name}</Link>
-          <span className="sample-tag">{t("label.sample")}</span>
         </p>
         <h1 className="lead-title">
           <Link href={href}>{article.title}</Link>

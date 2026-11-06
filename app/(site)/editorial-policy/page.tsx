@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "संपादकीय नीति",
-  description: "मिरेकल टाइम्स नमूना समाचारों को वास्तविक खबर से अलग रखने की नीति।",
+  description: "मिरेकल टाइम्स की संपादकीय नीति और रिपोर्टिंग मानक।",
   alternates: { canonical: "/editorial-policy/" },
 };
 

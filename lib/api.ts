@@ -98,6 +98,10 @@ function normalizeArticle(raw: ApiArticle): Article {
     ? raw.content.filter(isContentBlock)
     : [];
 
+  const seoTitle = typeof raw.seoTitle === "string" ? raw.seoTitle.trim() : "";
+  const seoDescription =
+    typeof raw.seoDescription === "string" ? raw.seoDescription.trim() : "";
+
   return {
     id: String(raw.id ?? ""),
     slug: String(raw.slug ?? ""),
@@ -115,6 +119,9 @@ function normalizeArticle(raw: ApiArticle): Article {
     featured: Boolean(raw.featured),
     breaking: Boolean(raw.breaking),
     tags: Array.isArray(raw.tags) ? raw.tags.map(String) : undefined,
+    language: raw.language || undefined,
+    seoTitle: seoTitle || undefined,
+    seoDescription: seoDescription || undefined,
     demoRank:
       typeof raw.demoRank === "number" && Number.isFinite(raw.demoRank)
         ? raw.demoRank
@@ -149,7 +156,11 @@ async function apiGet<T>(
 ): Promise<{ data: T; meta?: ApiMeta }> {
   const url = `${getApiBaseUrl()}/api${path}${buildQuery(query)}`;
 
-  // Browser: always fresh. Build/SSR: allow caching so static export can prerender.
+  // Browser: always fresh. Build/SSR: `force-cache` so `output: "export"` can
+  // statically prerender. `scripts/static-export-build.mjs` deletes
+  // `.next/cache/fetch-cache` before each export so published slugs/metadata
+  // are not reused across builds. Do not switch this to `no-store` — that opts
+  // the route into dynamic rendering and breaks static export metadata.
   const defaultCache: RequestCache =
     typeof window === "undefined" ? "force-cache" : "no-store";
 
@@ -245,31 +256,31 @@ export async function resolveArticleForLocale(
   slug: string,
   language: Locale,
 ): Promise<{ article: Article; canonicalSlug: string } | null> {
+  let bridge: Article | null = null;
   try {
-    const article = await fetchArticleBySlug(slug, language);
-    return { article, canonicalSlug: article.slug };
+    bridge = await fetchArticleBySlug(slug, language);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) {
       throw error;
     }
   }
 
-  const otherLanguage: Locale = language === "hi" ? "en" : "hi";
-  let bridge: Article | null = null;
-  try {
-    bridge = await fetchArticleBySlug(slug, otherLanguage);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return null;
-    }
-    throw error;
+  if (bridge && bridge.language === language) {
+    return { article: bridge, canonicalSlug: bridge.slug };
+  }
+
+  // Slug may belong to the other language (API resolves by slug).
+  // Find the sibling translation for the requested UI language.
+  const publicId = bridge?.id;
+  if (!publicId) {
+    return null;
   }
 
   const { articles } = await fetchArticles({
     language,
     limit: 100,
   });
-  const match = articles.find((item) => item.id === bridge!.id);
+  const match = articles.find((item) => item.id === publicId);
   if (!match) return null;
 
   // List payloads omit content blocks — load the canonical translation.

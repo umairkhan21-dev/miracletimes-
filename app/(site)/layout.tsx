@@ -1,5 +1,4 @@
 import { LanguageProvider } from "@/components/LanguageProvider";
-import { SampleBanner } from "@/components/SampleBanner";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SkipLink } from "@/components/SkipLink";
@@ -34,7 +33,7 @@ export const metadata: Metadata = {
 
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
-    <div lang="hi" className="site-shell">
+    <div lang="hi" className="site-shell" suppressHydrationWarning>
       <script dangerouslySetInnerHTML={{ __html: langBootScript }} />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link
@@ -50,7 +49,6 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       <LanguageProvider>
         <SkipLink />
         <SiteHeader />
-        <SampleBanner />
         <main id="content" className="site-main">
           {children}
         </main>

@@ -61,10 +61,12 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   );
 
   useLayoutEffect(() => {
+    const htmlLang = locale === "hi" ? "hi" : "en";
     document.documentElement.dataset.uiLang = locale;
+    document.documentElement.lang = htmlLang;
     const shell = document.querySelector(".site-shell");
     if (shell instanceof HTMLElement) {
-      shell.lang = locale === "hi" ? "hi" : "en";
+      shell.lang = htmlLang;
       shell.classList.add("is-lang-ready");
     }
   }, [locale]);

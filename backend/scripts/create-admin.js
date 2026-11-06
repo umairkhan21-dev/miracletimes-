@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * Secure one-time admin bootstrap.
+ * Secure one-time admin bootstrap / password reset.
  * Usage:
  *   node scripts/create-admin.js --name "Desk Admin" --email admin@example.com --password '...'
+ *   node scripts/create-admin.js --email admin@example.com --password '...' --reset-password
  * Or set ADMIN_NAME, ADMIN_EMAIL, ADMIN_PASSWORD in the environment.
+ *
+ * Never log or echo the password. Do not use example/dev passwords in production.
  */
 const path = require("path");
 const bcrypt = require("bcryptjs");
@@ -19,20 +22,35 @@ function readArg(flag) {
   return process.argv[index + 1];
 }
 
+function hasFlag(flag) {
+  return process.argv.includes(flag);
+}
+
 async function main() {
+  const resetPassword = hasFlag("--reset-password");
   const name = readArg("--name") || process.env.ADMIN_NAME;
   const email = readArg("--email") || process.env.ADMIN_EMAIL;
   const password = readArg("--password") || process.env.ADMIN_PASSWORD;
 
-  if (!name || !email || !password) {
+  if (!email || !password || (!resetPassword && !name)) {
     console.error(
-      "Missing required values. Provide --name, --email, --password (or ADMIN_* env vars).",
+      "Missing required values.\n" +
+        "  Create:  --name --email --password\n" +
+        "  Reset:   --email --password --reset-password",
     );
     process.exit(1);
   }
 
-  if (password.length < 10) {
-    console.error("Password must be at least 10 characters.");
+  if (password.length < 12) {
+    console.error("Password must be at least 12 characters.");
+    process.exit(1);
+  }
+
+  const weak = /^(password|admin|changeme|change-me|secret|test)/i.test(
+    password,
+  );
+  if (weak) {
+    console.error("Password looks like an example/placeholder value. Choose a unique secret.");
     process.exit(1);
   }
 
@@ -42,8 +60,29 @@ async function main() {
     [email],
   );
 
+  if (resetPassword) {
+    if (!existing.length) {
+      console.error(`No user found for ${email}.`);
+      process.exit(1);
+    }
+    const passwordHash = await bcrypt.hash(password, 12);
+    await pool.execute(
+      `UPDATE users
+       SET password_hash = ?, role = 'admin', is_active = 1, updated_at = UTC_TIMESTAMP()
+       WHERE id = ?`,
+      [passwordHash, existing[0].id],
+    );
+    console.log(
+      `Admin password reset successfully (id=${existing[0].id}, email=${email}).`,
+    );
+    return;
+  }
+
   if (existing.length) {
-    console.error(`User already exists for ${email} (id=${existing[0].id}, role=${existing[0].role}).`);
+    console.error(
+      `User already exists for ${email} (id=${existing[0].id}, role=${existing[0].role}). ` +
+        "Use --reset-password to rotate the password.",
+    );
     process.exit(1);
   }
 
