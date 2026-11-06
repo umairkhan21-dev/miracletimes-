@@ -6,5 +6,7 @@ export const site = {
     "मिरेकल टाइम्स उत्तर प्रदेश, लखनऊ, राजनीति, कारोबार, शिक्षा और देश-दुनिया की हिंदी खबरों का डिजिटल अखबार है।",
   url: "https://miracletimes.in",
   locale: "hi_IN",
-  email: "desk@miracletimes.in",
+  email: "miracletimes@gmail.com",
+  address:
+    "S-14/02, Second Floor, Karamat Market, Nishatganj, Lucknow.",
 } as const;

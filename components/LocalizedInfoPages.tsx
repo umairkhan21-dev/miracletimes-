@@ -25,7 +25,9 @@ export function ContactContent() {
         {t("contact.email")}{" "}
         <a href={`mailto:${site.email}`}>{site.email}</a>
       </p>
-      <p>{t("contact.location")}</p>
+      <p>
+        {t("contact.location")} {site.address}
+      </p>
       <h2>{t("contact.h2Topics")}</h2>
       <ul>
         <li>{t("contact.li1")}</li>

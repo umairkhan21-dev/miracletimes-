@@ -30,7 +30,8 @@ export const hi = {
   "brand.footerAbout":
     "मिरेकल टाइम्स उत्तर प्रदेश और लखनऊ को केंद्र में रखकर देश, राजनीति, कारोबार और रोजमर्रा की खबरें हिंदी में पढ़ने का अखबार है।",
   "brand.copyright": "© {year} Miracle Times. सर्वाधिकार सुरक्षित।",
-  "brand.location": "लखनऊ, उत्तर प्रदेश",
+  "brand.location":
+    "S-14/02, Second Floor, Karamat Market, Nishatganj, Lucknow.",
 
   "footer.categories": "श्रेणियाँ",
   "footer.institution": "संस्थान",
@@ -169,7 +170,7 @@ export const hi = {
   "contact.lede":
     "संपादकीय पत्राचार ईमेल से भेजें। यह फ्रंटएंड संदेश सहेजने वाला फ़ॉर्म नहीं चलाता।",
   "contact.email": "ईमेल:",
-  "contact.location": "स्थान: लखनऊ, उत्तर प्रदेश",
+  "contact.location": "पता:",
   "contact.h2Topics": "किस बात के लिए लिखें",
   "contact.li1": "तथ्य की शुद्धि या स्पष्टीकरण",
   "contact.li2": "प्रकाशन से जुड़ा सामान्य पत्र",

@@ -32,7 +32,8 @@ export const en: Messages = {
   "brand.footerAbout":
     "Miracle Times is a Hindi newspaper focused on Uttar Pradesh and Lucknow, covering national affairs, politics, business, and everyday news.",
   "brand.copyright": "© {year} Miracle Times. All rights reserved.",
-  "brand.location": "Lucknow, Uttar Pradesh",
+  "brand.location":
+    "S-14/02, Second Floor, Karamat Market, Nishatganj, Lucknow.",
 
   "footer.categories": "Categories",
   "footer.institution": "Organization",
@@ -171,7 +172,7 @@ export const en: Messages = {
   "contact.lede":
     "Send editorial correspondence by email. This frontend does not run a form that stores messages.",
   "contact.email": "Email:",
-  "contact.location": "Location: Lucknow, Uttar Pradesh",
+  "contact.location": "Address:",
   "contact.h2Topics": "What to write about",
   "contact.li1": "A factual correction or clarification",
   "contact.li2": "General correspondence about the publication",

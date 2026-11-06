@@ -49,7 +49,7 @@ export function SiteFooter() {
       </div>
       <div className="wrap footer-base">
         <p>{t("brand.copyright", { year })}</p>
-        <p>{t("brand.location")}</p>
+        <p>{site.address}</p>
       </div>
     </footer>
   );
