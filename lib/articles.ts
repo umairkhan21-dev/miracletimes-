@@ -11,9 +11,10 @@ function article(
 }
 
 /**
- * Legacy in-memory demo dataset (unused by the live UI).
- * Public pages now load published content from the Express API via `lib/api.ts`.
- * Kept for reference / offline fixtures only — do not import into pages.
+ * Temporary in-memory demo dataset for frontend-only client UI review.
+ * Used as a fallback when the live API has no published articles (see
+ * `lib/demoContent.ts` + `lib/content.ts`). Delete / disconnect after real
+ * news is published from the admin panel.
  */
 export const articles: Article[] = [
  article({

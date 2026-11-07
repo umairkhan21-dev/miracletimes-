@@ -5,6 +5,10 @@ import {
   fetchTrendingArticles,
 } from "@/lib/api";
 import { categories, categoryName, getCategory } from "@/lib/categories";
+import {
+  filterDemoByCategory,
+  getDemoArticles,
+} from "@/lib/demoContent";
 import type { Locale } from "@/lib/i18n/config";
 import { demoPath } from "@/lib/paths";
 import type { Article } from "@/lib/types";
@@ -274,16 +278,45 @@ export function filterArticlesByQuery(articles: Article[], query: string) {
   });
 }
 
+async function loadArticlesWithDemoFallback(
+  language: Locale,
+  category?: string,
+): Promise<Article[]> {
+  try {
+    const articles = await fetchAllArticles({ language, category });
+    if (articles.length) return articles;
+  } catch {
+    // API empty/unreachable — use frontend demo corpus for UI review.
+  }
+
+  if (category) return filterDemoByCategory(category);
+  return getDemoArticles(language);
+}
+
 export async function loadArticles(language: Locale): Promise<Article[]> {
-  return fetchAllArticles({ language });
+  return loadArticlesWithDemoFallback(language);
 }
 
 export async function loadHomepageBundle(language: Locale) {
-  const [articles, breaking, trending] = await Promise.all([
-    fetchAllArticles({ language }),
-    fetchBreakingArticles(language, 8),
-    fetchTrendingArticles(language, 8),
-  ]);
+  let articles: Article[] = [];
+  let breaking: Article[] = [];
+  let trending: Article[] = [];
+
+  try {
+    [articles, breaking, trending] = await Promise.all([
+      fetchAllArticles({ language }),
+      fetchBreakingArticles(language, 8),
+      fetchTrendingArticles(language, 8),
+    ]);
+  } catch {
+    articles = [];
+    breaking = [];
+    trending = [];
+  }
+
+  if (!articles.length) {
+    articles = getDemoArticles(language);
+  }
 
   const homepage = buildHomepage(articles);
   return {
@@ -299,16 +332,23 @@ export async function loadArticlesByCategory(
   language: Locale,
   categorySlug: string,
 ) {
-  return fetchAllArticles({ language, category: categorySlug });
+  return loadArticlesWithDemoFallback(language, categorySlug);
 }
 
 export async function searchArticlesRemote(language: Locale, query: string) {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  const { articles } = await fetchArticles({
-    language,
-    q: trimmed,
-    limit: 50,
-  });
-  return articles;
+
+  try {
+    const { articles } = await fetchArticles({
+      language,
+      q: trimmed,
+      limit: 50,
+    });
+    if (articles.length) return articles;
+  } catch {
+    // Fall through to local demo search.
+  }
+
+  return filterArticlesByQuery(getDemoArticles(language), trimmed);
 }

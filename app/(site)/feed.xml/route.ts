@@ -1,5 +1,6 @@
 import { fetchAllArticles } from "@/lib/api";
 import { categoryName } from "@/lib/categories";
+import { getDemoArticles } from "@/lib/demoContent";
 import type { Locale } from "@/lib/i18n/config";
 import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
@@ -14,6 +15,15 @@ function escapeXml(value: string) {
     .replace(/>/g, "&gt;");
 }
 
+function uniqueBySlug(items: Article[]): Article[] {
+  const seen = new Set<string>();
+  return items.filter((article) => {
+    if (!article.slug || seen.has(article.slug)) return false;
+    seen.add(article.slug);
+    return true;
+  });
+}
+
 /**
  * Combined Hindi + English RSS feed at the existing /feed.xml URL.
  * Items keep their language via the slug's translation and a category hint.
@@ -25,21 +35,21 @@ export async function GET() {
       fetchAllArticles({ language: "hi" }),
       fetchAllArticles({ language: "en" }),
     ]);
-    const seen = new Set<string>();
-    articles = [...hiArticles, ...enArticles]
-      .filter((article) => {
-        if (!article.slug || seen.has(article.slug)) return false;
-        seen.add(article.slug);
-        return true;
-      })
-      .sort(
-        (a, b) =>
-          new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-      );
+    articles = uniqueBySlug([...hiArticles, ...enArticles]).sort(
+      (a, b) =>
+        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+    );
   } catch (error) {
     console.warn(
       "RSS feed could not load articles from API:",
       error instanceof Error ? error.message : error,
+    );
+  }
+
+  if (!articles.length) {
+    articles = uniqueBySlug(getDemoArticles()).sort(
+      (a, b) =>
+        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
     );
   }
 

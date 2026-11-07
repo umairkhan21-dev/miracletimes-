@@ -5,6 +5,7 @@ import {
   resolveArticleForLocale,
 } from "@/lib/api";
 import { categoryName } from "@/lib/categories";
+import { getDemoSlugs } from "@/lib/demoContent";
 import {
   articleCanonicalUrl,
   buildArticleJsonLd,
@@ -31,26 +32,25 @@ export async function generateStaticParams() {
     if (slugs.length) {
       return slugs.map((slug) => ({ slug }));
     }
-    if (isStaticExport) {
-      throw new Error(
-        "STATIC_EXPORT build found zero published article slugs. Confirm the API is reachable and NEXT_PUBLIC_API_URL points at the live API.",
-      );
-    }
   } catch (error) {
-    if (isStaticExport) {
-      throw error;
-    }
     console.warn(
       "Could not load article slugs from API during build:",
       error instanceof Error ? error.message : error,
     );
   }
 
-  // Local non-export fallback only — never bake these into production export.
-  return [
-    { slug: "agra-virasat-yatayat-namuna" },
-    { slug: "agra-heritage-traffic-sample" },
-  ];
+  const demoSlugs = getDemoSlugs();
+  if (demoSlugs.length) {
+    return demoSlugs.map((slug) => ({ slug }));
+  }
+
+  if (isStaticExport) {
+    throw new Error(
+      "STATIC_EXPORT build found zero article slugs (API empty and no demo corpus).",
+    );
+  }
+
+  return [];
 }
 
 async function loadArticleForMetadata(slug: string) {

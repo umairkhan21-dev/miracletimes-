@@ -1,7 +1,9 @@
 import { fetchAllArticles } from "@/lib/api";
 import { categories, infoLinks } from "@/lib/categories";
+import { getDemoArticles } from "@/lib/demoContent";
 import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
+import type { Article } from "@/lib/types";
 import type { MetadataRoute } from "next";
 
 export const dynamic = "force-static";
@@ -12,24 +14,32 @@ function absoluteHref(href: string): string {
   return `${origin}${path.endsWith("/") ? path : `${path}/`}`;
 }
 
+function uniqueBySlug(items: Article[]): Article[] {
+  const seen = new Set<string>();
+  return items.filter((article) => {
+    if (!article.slug || seen.has(article.slug)) return false;
+    seen.add(article.slug);
+    return true;
+  });
+}
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let articles: Awaited<ReturnType<typeof fetchAllArticles>> = [];
+  let articles: Article[] = [];
   try {
     const [hiArticles, enArticles] = await Promise.all([
       fetchAllArticles({ language: "hi" }),
       fetchAllArticles({ language: "en" }),
     ]);
-    const seen = new Set<string>();
-    articles = [...hiArticles, ...enArticles].filter((article) => {
-      if (seen.has(article.slug)) return false;
-      seen.add(article.slug);
-      return true;
-    });
+    articles = uniqueBySlug([...hiArticles, ...enArticles]);
   } catch (error) {
     console.warn(
       "Sitemap could not load articles from API:",
       error instanceof Error ? error.message : error,
     );
+  }
+
+  if (!articles.length) {
+    articles = uniqueBySlug(getDemoArticles());
   }
 
   const lastArticle = articles[0]?.publishedAt;
