@@ -73,6 +73,11 @@ export function getApiBaseUrl(): string {
   return (configured || DEFAULT_API_URL).replace(/\/$/, "");
 }
 
+/** True when a real API origin is configured (not the local default). */
+export function isApiConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_API_URL?.trim());
+}
+
 /** Turn relative upload paths into absolute URLs against the API host. */
 export function resolveMediaUrl(url: string | null | undefined): string {
   if (!url) return "";
@@ -205,6 +210,15 @@ async function apiGet<T>(
 export async function fetchArticles(
   params: ArticleListParams = {},
 ): Promise<{ articles: Article[]; meta?: ApiMeta }> {
+  // Demo-only deploys (no API env) skip network and let callers use the
+  // frontend corpus via empty results / slug fallbacks.
+  if (!isApiConfigured()) {
+    return {
+      articles: [],
+      meta: { total: 0, page: 1, limit: params.limit ?? 20, totalPages: 0, hasNext: false, hasPrev: false },
+    };
+  }
+
   const { data, meta } = await apiGet<ApiArticle[]>("/articles", {
     language: params.language ?? "hi",
     page: params.page ?? 1,
@@ -225,6 +239,8 @@ export async function fetchArticles(
 export async function fetchAllArticles(
   params: Omit<ArticleListParams, "page" | "limit"> & { pageSize?: number } = {},
 ): Promise<Article[]> {
+  if (!isApiConfigured()) return [];
+
   const pageSize = params.pageSize ?? 100;
   const first = await fetchArticles({ ...params, page: 1, limit: pageSize });
   const articles = [...first.articles];
@@ -242,6 +258,12 @@ export async function fetchArticleBySlug(
   slug: string,
   language: Locale = "hi",
 ): Promise<Article> {
+  if (!isApiConfigured()) {
+    const demo = findDemoArticle(slug);
+    if (demo) return demo;
+    throw new ApiError("Article not found", 404, "NOT_FOUND");
+  }
+
   try {
     const { data } = await apiGet<ApiArticle>(
       `/articles/${encodeURIComponent(slug)}`,
@@ -317,6 +339,7 @@ export async function fetchFeaturedArticles(
   language: Locale = "hi",
   limit = 10,
 ): Promise<Article[]> {
+  if (!isApiConfigured()) return [];
   const { data } = await apiGet<ApiArticle[]>("/articles/featured", {
     language,
     limit,
@@ -328,6 +351,7 @@ export async function fetchBreakingArticles(
   language: Locale = "hi",
   limit = 8,
 ): Promise<Article[]> {
+  if (!isApiConfigured()) return [];
   const { data } = await apiGet<ApiArticle[]>("/articles/breaking", {
     language,
     limit,
@@ -339,6 +363,7 @@ export async function fetchTrendingArticles(
   language: Locale = "hi",
   limit = 8,
 ): Promise<Article[]> {
+  if (!isApiConfigured()) return [];
   const { data } = await apiGet<ApiArticle[]>("/articles/trending", {
     language,
     limit,
@@ -349,6 +374,7 @@ export async function fetchTrendingArticles(
 export async function fetchCategories(
   language: Locale = "hi",
 ): Promise<Category[]> {
+  if (!isApiConfigured()) return [];
   const { data } = await apiGet<ApiCategory[]>("/categories", { language });
   return (Array.isArray(data) ? data : []).map(normalizeCategory);
 }
@@ -357,6 +383,9 @@ export async function fetchCategoryBySlug(
   slug: string,
   language: Locale = "hi",
 ): Promise<Category> {
+  if (!isApiConfigured()) {
+    throw new ApiError("Category not found", 404, "NOT_FOUND");
+  }
   const { data } = await apiGet<ApiCategory>(
     `/categories/${encodeURIComponent(slug)}`,
     { language },
@@ -366,6 +395,8 @@ export async function fetchCategoryBySlug(
 
 /** Collect published slugs for both languages (static export paths). */
 export async function fetchPublishedSlugs(): Promise<string[]> {
+  if (!isApiConfigured()) return getDemoSlugs();
+
   try {
     const [hiArticles, enArticles] = await Promise.all([
       fetchAllArticles({ language: "hi" }),
