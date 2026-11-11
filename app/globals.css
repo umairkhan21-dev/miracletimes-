@@ -185,15 +185,15 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .brand-mark {
   display: flex;
-  background: var(--charcoal);
-  padding: 6px 8px;
+  background: transparent;
+  padding: 0;
   flex: none;
 }
 
 .brand-mark img,
 .brand-logo {
   display: block;
-  width: 78px;
+  width: 86px;
   height: 43px;
   object-fit: contain;
 }
@@ -942,7 +942,7 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
     white-space: nowrap;
   }
   .wrap { width: min(1120px, calc(100% - 24px)); }
-  .brand-logo { width: 64px; height: 35px; }
+  .brand-logo { width: 72px; height: 36px; }
   .support-card { grid-template-columns: 96px minmax(0, 1fr); }
   .story-card--row { grid-template-columns: 104px minmax(0, 1fr); }
 }

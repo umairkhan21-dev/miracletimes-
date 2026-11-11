@@ -56,7 +56,7 @@ export default function AdminLoginPage() {
       <div className="admin-login-page">
         <form className="admin-card admin-login-card" onSubmit={onSubmit}>
           <div className="admin-brand" style={{ marginBottom: 18, color: "inherit" }}>
-            <Image src="/mark.png" alt="" width={52} height={31} />
+            <Image src="/mark.png" alt="" width={64} height={32} />
             <div>
               <strong style={{ color: "#1c1915" }}>Miracle Times</strong>
               <span style={{ color: "#6b645a" }}>Administrator sign-in</span>
