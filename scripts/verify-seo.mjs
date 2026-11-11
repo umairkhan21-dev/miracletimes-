@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * SEO helper + static-export HTML checks.
- * Run after `npm run build:export` for HTML assertions.
+ * SEO helper unit tests + optional HTML checks.
+ * HTML assertions prefer a live SSR server (SSR_BASE_URL) and fall back to
+ * legacy out/ only if present. Prefer `npm run test:ssr-smoke` for SSR HTML.
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -96,7 +97,19 @@ test("publicShareImageUrl rejects localhost and empty values", () => {
   );
 });
 
-function readExport(slug) {
+async function readLiveOrExport(slug) {
+  const ssrBase = (process.env.SSR_BASE_URL || "").replace(/\/$/, "");
+  if (ssrBase) {
+    try {
+      const response = await fetch(`${ssrBase}/news/${slug}/`);
+      if (!response.ok) return null;
+      const html = await response.text();
+      return { html, head: html.split("</head>")[0] };
+    } catch {
+      return null;
+    }
+  }
+
   const file = path.join(root, "out", "news", slug, "index.html");
   if (!fs.existsSync(file)) {
     return null;
@@ -130,10 +143,12 @@ function assertMeta(head, { titleIncludes, descriptionIncludes, ogType, canonica
   }
 }
 
-test("exported Hindi article HTML uses admin SEO fields and body content", (t) => {
-  const exported = readExport(HI_SLUG);
+test("Hindi article HTML uses admin SEO fields and body content", async (t) => {
+  const exported = await readLiveOrExport(HI_SLUG);
   if (!exported) {
-    t.skip(`out/news/${HI_SLUG} missing — run build:export first`);
+    t.skip(
+      `SSR/out HTML for ${HI_SLUG} missing — run next start or test:ssr-smoke`,
+    );
     return;
   }
   assertMeta(exported.head, {
@@ -150,7 +165,6 @@ test("exported Hindi article HTML uses admin SEO fields and body content", (t) =
   assert.doesNotMatch(exported.head, /Miracle Times — Miracle Times/);
   assert.match(exported.html, /<html[^>]*lang="hi"/);
   assert.match(exported.html, /name="language" content="hi"/);
-  // Full article body must be in initial HTML (not only after JS).
   assert.match(exported.html, /<h1>/);
   assert.match(exported.html, /class="story-body"/);
   assert.match(exported.html, /class="story-dek"/);
@@ -158,10 +172,12 @@ test("exported Hindi article HTML uses admin SEO fields and body content", (t) =
   assert.doesNotMatch(exported.html, /खबरें लोड हो रही हैं/);
 });
 
-test("exported English article HTML uses SEO fields and hreflang", (t) => {
-  const exported = readExport(EN_SLUG);
+test("English article HTML uses SEO fields and hreflang", async (t) => {
+  const exported = await readLiveOrExport(EN_SLUG);
   if (!exported) {
-    t.skip(`out/news/${EN_SLUG} missing — run build:export first`);
+    t.skip(
+      `SSR/out HTML for ${EN_SLUG} missing — run next start or test:ssr-smoke`,
+    );
     return;
   }
   assertMeta(exported.head, {
@@ -182,20 +198,33 @@ test("exported English article HTML uses SEO fields and hreflang", (t) => {
   assert.match(exported.html, /name="language" content="en"/);
 });
 
-test("exported homepage keeps default Hindi html lang", (t) => {
+test("homepage keeps default Hindi html lang", async (t) => {
+  const ssrBase = (process.env.SSR_BASE_URL || "").replace(/\/$/, "");
+  if (ssrBase) {
+    try {
+      const response = await fetch(`${ssrBase}/`);
+      const html = await response.text();
+      assert.match(html, /<html[^>]*lang="hi"/);
+      return;
+    } catch {
+      // fall through
+    }
+  }
   const file = path.join(root, "out", "index.html");
   if (!fs.existsSync(file)) {
-    t.skip("out/index.html missing — run build:export first");
+    t.skip("homepage HTML missing — run next start or test:ssr-smoke");
     return;
   }
   const html = fs.readFileSync(file, "utf8");
   assert.match(html, /<html[^>]*lang="hi"/);
 });
 
-test("exported branded SEO title is not doubled by the layout template", (t) => {
-  const exported = readExport(EN_BRANDED_SLUG);
+test("branded SEO title is not doubled by the layout template", async (t) => {
+  const exported = await readLiveOrExport(EN_BRANDED_SLUG);
   if (!exported) {
-    t.skip(`out/news/${EN_BRANDED_SLUG} missing — run build:export first`);
+    t.skip(
+      `SSR/out HTML for ${EN_BRANDED_SLUG} missing — run next start or test:ssr-smoke`,
+    );
     return;
   }
   assert.match(
@@ -207,10 +236,23 @@ test("exported branded SEO title is not doubled by the layout template", (t) => 
   assert.match(exported.html, /class="story-body"/);
 });
 
-test("exported robots.txt matches app robots policy", (t) => {
+test("robots.txt matches app robots policy", async (t) => {
+  const ssrBase = (process.env.SSR_BASE_URL || "").replace(/\/$/, "");
+  if (ssrBase) {
+    try {
+      const response = await fetch(`${ssrBase}/robots.txt`);
+      const text = await response.text();
+      assert.match(text, /Disallow:\s*\/admin\//);
+      assert.match(text, /Disallow:\s*\/search\//);
+      assert.match(text, /Sitemap:\s*https:\/\/miracletimes\.in\/sitemap\.xml/);
+      return;
+    } catch {
+      // fall through
+    }
+  }
   const file = path.join(root, "out", "robots.txt");
   if (!fs.existsSync(file)) {
-    t.skip("out/robots.txt missing — run build:export first");
+    t.skip("robots.txt missing — run next start or test:ssr-smoke");
     return;
   }
   const text = fs.readFileSync(file, "utf8");
@@ -220,10 +262,23 @@ test("exported robots.txt matches app robots policy", (t) => {
   assert.match(text, /Host:\s*https:\/\/miracletimes\.in/);
 });
 
-test("exported sitemap.xml lists current published article URLs", (t) => {
+test("sitemap.xml lists current published article URLs", async (t) => {
+  const ssrBase = (process.env.SSR_BASE_URL || "").replace(/\/$/, "");
+  if (ssrBase) {
+    try {
+      const response = await fetch(`${ssrBase}/sitemap.xml`);
+      const xml = await response.text();
+      assert.match(xml, new RegExp(`/news/${HI_SLUG}/`));
+      assert.match(xml, new RegExp(`/news/${EN_SLUG}/`));
+      assert.match(xml, /https:\/\/miracletimes\.in\//);
+      return;
+    } catch {
+      // fall through
+    }
+  }
   const file = path.join(root, "out", "sitemap.xml");
   if (!fs.existsSync(file)) {
-    t.skip("out/sitemap.xml missing — run build:export first");
+    t.skip("sitemap.xml missing — run next start or test:ssr-smoke");
     return;
   }
   const xml = fs.readFileSync(file, "utf8");

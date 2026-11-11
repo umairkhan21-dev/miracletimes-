@@ -9,6 +9,7 @@ import { HomePageContent } from "@/components/HomePageContent";
 import { useI18n } from "@/components/LanguageProvider";
 import { ApiError } from "@/lib/api";
 import { loadHomepageBundle, type HomeSection } from "@/lib/content";
+import type { Locale } from "@/lib/i18n/config";
 import { demoPath } from "@/lib/paths";
 import type { Article } from "@/lib/types";
 import { useEffect, useState } from "react";
@@ -32,17 +33,36 @@ type HomepageBundle = {
 
 export function HomePageLoader({
   jsonLd,
+  initialLocale,
+  initialBundle,
 }: {
   jsonLd: Record<string, unknown>;
+  initialLocale?: Locale;
+  initialBundle?: HomepageBundle | null;
 }) {
   const { locale, t } = useI18n();
+  const hasServerBundle =
+    Boolean(initialBundle?.lead) &&
+    (!initialLocale || initialLocale === locale);
+
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
+    hasServerBundle ? "ready" : "loading",
   );
-  const [data, setData] = useState<HomepageBundle | null>(null);
+  const [data, setData] = useState<HomepageBundle | null>(
+    hasServerBundle ? initialBundle! : null,
+  );
 
   useEffect(() => {
     let cancelled = false;
+
+    if (initialBundle?.lead && initialLocale === locale) {
+      setData(initialBundle);
+      setStatus("ready");
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setStatus("loading");
 
     loadHomepageBundle(locale)
@@ -63,7 +83,7 @@ export function HomePageLoader({
     return () => {
       cancelled = true;
     };
-  }, [locale]);
+  }, [locale, initialBundle, initialLocale]);
 
   if (status === "loading") {
     return <ContentLoading message={t("content.loading")} />;

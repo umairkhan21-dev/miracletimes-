@@ -20,8 +20,8 @@ const baseProd = {
   FRONTEND_URL: "https://miracletimes.in",
   CORS_ORIGINS: "https://miracletimes.in,https://www.miracletimes.in",
   PUBLIC_BASE_URL: "https://api.miracletimes.in",
-  FRONTEND_DEPLOY_HOOK_URL:
-    "https://api.vercel.com/v1/integrations/deploy/example",
+  CACHE_REVALIDATE_URL: "https://miracletimes.in/api/revalidate/",
+  CACHE_REVALIDATE_TOKEN: "a".repeat(32) + "-revalidate-token",
 };
 
 describe("production environment validation", () => {
@@ -91,7 +91,7 @@ describe("production environment validation", () => {
     assert.equal(parsed.success, true);
     assert.equal(parsed.data.isProduction, false);
     assert.equal(parsed.data.DB_PASSWORD, "");
-    assert.equal(parsed.data.FRONTEND_DEPLOY_HOOK_URL, "");
+    assert.equal(parsed.data.CACHE_REVALIDATE_URL, "");
   });
 
   it("rejects empty DB_PASSWORD in production", () => {
@@ -105,23 +105,52 @@ describe("production environment validation", () => {
     );
   });
 
-  it("rejects missing FRONTEND_DEPLOY_HOOK_URL in production", () => {
+  it("rejects missing CACHE_REVALIDATE_URL in production", () => {
     const parsed = parseEnv({
       ...baseProd,
-      FRONTEND_DEPLOY_HOOK_URL: "",
+      CACHE_REVALIDATE_URL: "",
     });
     assert.equal(parsed.success, false);
     assert.ok(
       parsed.error.issues.some(
-        (issue) => issue.path.join(".") === "FRONTEND_DEPLOY_HOOK_URL",
+        (issue) => issue.path.join(".") === "CACHE_REVALIDATE_URL",
       ),
     );
   });
 
-  it("rejects non-HTTPS FRONTEND_DEPLOY_HOOK_URL in production", () => {
+  it("rejects missing CACHE_REVALIDATE_TOKEN in production", () => {
     const parsed = parseEnv({
       ...baseProd,
-      FRONTEND_DEPLOY_HOOK_URL: "http://example.com/hooks/bad",
+      CACHE_REVALIDATE_TOKEN: "",
+    });
+    assert.equal(parsed.success, false);
+    assert.ok(
+      parsed.error.issues.some(
+        (issue) => issue.path.join(".") === "CACHE_REVALIDATE_TOKEN",
+      ),
+    );
+  });
+
+  it("accepts loopback HTTP CACHE_REVALIDATE_URL in production", () => {
+    const parsed = parseEnv({
+      ...baseProd,
+      CACHE_REVALIDATE_URL: "http://127.0.0.1:3000/api/revalidate/",
+    });
+    assert.equal(parsed.success, true);
+  });
+
+  it("rejects non-HTTPS public CACHE_REVALIDATE_URL in production", () => {
+    const parsed = parseEnv({
+      ...baseProd,
+      CACHE_REVALIDATE_URL: "http://example.com/api/revalidate",
+    });
+    assert.equal(parsed.success, false);
+  });
+
+  it("requires S3 credentials when STORAGE_PROVIDER=s3", () => {
+    const parsed = parseEnv({
+      ...baseDev,
+      STORAGE_PROVIDER: "s3",
     });
     assert.equal(parsed.success, false);
   });
@@ -131,12 +160,12 @@ describe("production environment validation", () => {
       ...baseProd,
       COOKIE_DOMAIN: ".miracletimes.in",
       LISTEN_HOST: "127.0.0.1",
-      FRONTEND_DEPLOY_DEBOUNCE_MS: "30000",
+      CACHE_REVALIDATE_DEBOUNCE_MS: "3000",
     });
     assert.equal(parsed.success, true);
     assert.equal(parsed.data.COOKIE_DOMAIN, ".miracletimes.in");
     assert.equal(parsed.data.LISTEN_HOST, "127.0.0.1");
-    assert.equal(parsed.data.FRONTEND_DEPLOY_DEBOUNCE_MS, 30000);
+    assert.equal(parsed.data.CACHE_REVALIDATE_DEBOUNCE_MS, 3000);
   });
 
   it("rejects invalid LISTEN_HOST", () => {

@@ -1,0 +1,27 @@
+[Unit]
+Description=Miracle Times Next.js (SSR/ISR)
+After=network.target
+Wants=miracle-times-api.service
+
+[Service]
+Type=simple
+User=miracletimes
+Group=miracletimes
+WorkingDirectory=/opt/miracletimes
+EnvironmentFile=/etc/miracle-times/web.env
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1 --port 3000
+Restart=on-failure
+RestartSec=5
+# Resource caps — keep Miracle Drugs headroom on shared Contabo VPS
+MemoryMax=768M
+CPUQuota=150%
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/miracletimes/.next /var/log/miracle-times
+
+[Install]
+WantedBy=multi-user.target

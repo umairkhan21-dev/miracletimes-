@@ -1,11 +1,11 @@
-import { fetchAllArticles } from "@/lib/api";
+import { fetchArticles } from "@/lib/api";
 import { categoryName } from "@/lib/categories";
 import type { Locale } from "@/lib/i18n/config";
 import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { Article } from "@/lib/types";
 
-export const dynamic = "force-static";
+export const revalidate = 600;
 
 function escapeXml(value: string) {
   return value
@@ -24,17 +24,17 @@ function uniqueBySlug(items: Article[]): Article[] {
 }
 
 /**
- * Combined Hindi + English RSS feed at the existing /feed.xml URL.
- * Items keep their language via the slug's translation and a category hint.
+ * Combined Hindi + English RSS feed at /feed.xml.
+ * Regenerates on ISR / on-demand revalidation — no static export rebuild.
  */
 export async function GET() {
   let articles: Article[] = [];
   try {
-    const [hiArticles, enArticles] = await Promise.all([
-      fetchAllArticles({ language: "hi" }),
-      fetchAllArticles({ language: "en" }),
+    const [hi, en] = await Promise.all([
+      fetchArticles({ language: "hi", page: 1, limit: 40 }),
+      fetchArticles({ language: "en", page: 1, limit: 40 }),
     ]);
-    articles = uniqueBySlug([...hiArticles, ...enArticles]).sort(
+    articles = uniqueBySlug([...hi.articles, ...en.articles]).sort(
       (a, b) =>
         new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
     );
@@ -77,6 +77,8 @@ export async function GET() {
   return new Response(xml, {
     headers: {
       "Content-Type": "application/rss+xml; charset=utf-8",
+      "Cache-Control":
+        "public, s-maxage=600, stale-while-revalidate=86400",
     },
   });
 }

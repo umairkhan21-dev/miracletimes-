@@ -1,5 +1,5 @@
 const articleService = require("../services/articleService");
-const siteRebuildService = require("../services/siteRebuildService");
+const cacheRevalidateService = require("../services/cacheRevalidateService");
 const logger = require("../utils/logger");
 
 let running = false;
@@ -16,7 +16,7 @@ async function runOnce() {
     const publishedIds = await articleService.publishDueScheduledArticles();
     if (publishedIds.length) {
       logger.info("Published scheduled articles", { count: publishedIds.length, ids: publishedIds });
-      siteRebuildService.requestFrontendRebuild("article.scheduled_publish");
+      cacheRevalidateService.requestCacheRevalidation("article.scheduled_publish");
     }
     return publishedIds;
   } catch (error) {

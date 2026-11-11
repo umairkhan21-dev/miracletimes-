@@ -1,12 +1,15 @@
 import { LocalizedCategoryView } from "@/components/LocalizedCategoryView";
 import { getCategory } from "@/lib/categories";
+import { loadArticlesByCategory } from "@/lib/content";
+import { DEFAULT_LOCALE } from "@/lib/i18n/config";
 import { site } from "@/lib/site";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 type Props = { params: Promise<{ slug: string }> };
 
-export const dynamicParams = false;
+export const revalidate = 120;
+export const dynamicParams = true;
 
 export function generateStaticParams() {
   return [
@@ -47,5 +50,17 @@ export default async function CategoryRoute({ params }: Props) {
   const { slug } = await params;
   const category = getCategory(slug);
   if (!category) notFound();
-  return <LocalizedCategoryView slug={category.slug} pageSize={2} />;
+
+  const articles = await loadArticlesByCategory(DEFAULT_LOCALE, category.slug, {
+    limit: 60,
+  });
+
+  return (
+    <LocalizedCategoryView
+      slug={category.slug}
+      pageSize={12}
+      initialLocale={DEFAULT_LOCALE}
+      initialArticles={articles}
+    />
+  );
 }

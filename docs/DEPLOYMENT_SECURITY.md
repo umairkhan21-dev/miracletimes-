@@ -8,11 +8,12 @@ Recommended architecture (Contabo VPS, same registrable domain):
 
 | Role | Origin |
 |---|---|
-| Public website + admin UI (Nginx static `out/`) | `https://miracletimes.in` (and optionally `https://www.miracletimes.in`) |
-| Express API + uploads (Nginx → `127.0.0.1`) | `https://api.miracletimes.in` |
-| Rebuild webhook (Nginx → `127.0.0.1:4010`) | `https://miracletimes.in/hooks/rebuild` |
+| Public website + admin UI (Nginx → Next.js SSR/ISR `127.0.0.1:3000`) | `https://miracletimes.in` (and optionally `https://www.miracletimes.in`) |
+| Express API + uploads (Nginx → `127.0.0.1:4000`) | `https://api.miracletimes.in` |
+| Cache revalidation | API → loopback `POST http://127.0.0.1:3000/api/revalidate/` |
 
-See [CONTABO_DEPLOYMENT.md](./CONTABO_DEPLOYMENT.md) and `deploy/contabo/`.
+Authoritative Contabo cutover steps: [CONTABO_DEPLOYMENT.md](./CONTABO_DEPLOYMENT.md)
+and `deploy/contabo/`. Static `out/` + `/hooks/rebuild` are retired.
 This keeps browser cookie auth **same-site** (shared eTLD+1 `miracletimes.in`)
 while allowing TLS termination and process isolation for the API.
 
@@ -44,16 +45,18 @@ Set these on the API host. Never commit real values. Names only:
 | `UPLOAD_DIR` | Persistent upload path on the VPS |
 | `MAX_UPLOAD_BYTES` | Upload size cap |
 | `SCHEDULE_INTERVAL_MS` | Scheduled publish poll interval |
-| `FRONTEND_DEPLOY_HOOK_URL` | **Required** HTTPS rebuild webhook URL (Contabo `/hooks/rebuild?token=…`, server-side only). Production startup fails if missing |
-| `FRONTEND_DEPLOY_DEBOUNCE_MS` | Optional debounce (default `45000`) |
+| `CACHE_REVALIDATE_URL` | **Required** in production — prefer `http://127.0.0.1:3000/api/revalidate/` |
+| `CACHE_REVALIDATE_TOKEN` | **Required** in production — shared secret (≥32 chars) matching Next `REVALIDATE_TOKEN` |
+| `CACHE_REVALIDATE_DEBOUNCE_MS` | Optional debounce (default `5000`) |
+| `STORAGE_PROVIDER` | `local` (default) or `s3` — keep local until object storage is configured |
 | `LISTEN_HOST` | Production defaults to `127.0.0.1` when unset. Set `0.0.0.0` only if a PaaS requires it |
 
-Frontend / rebuild host env:
+Frontend / Next host env (`web.env`):
 
 | Variable | Requirement |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | HTTPS API origin used by the static export (no secrets), e.g. `https://api.miracletimes.in` |
-| `REBUILD_HOOK_TOKEN` | Long random token for `deploy/contabo/rebuild-webhook.mjs` |
+| `NEXT_PUBLIC_API_URL` | HTTPS API origin (no secrets), e.g. `https://api.miracletimes.in` |
+| `REVALIDATE_TOKEN` | Same shared secret as API `CACHE_REVALIDATE_TOKEN` |
 
 ### Generating secrets (do this on a trusted machine)
 
@@ -70,9 +73,10 @@ Never put them in git, chat logs, or `NEXT_PUBLIC_*` variables.
 
 Production startup **rejects** weak/example `JWT_SECRET` values, empty
 `DB_PASSWORD`, missing `CORS_ORIGINS`, wildcard CORS, non-HTTPS public URLs,
-and a missing/non-HTTPS `FRONTEND_DEPLOY_HOOK_URL` (static publishes would
-otherwise never rebuild). Local development may still use an empty deploy
-hook, empty `DB_PASSWORD`, and the example secret from `backend/.env.example`.
+and missing `CACHE_REVALIDATE_URL` / `CACHE_REVALIDATE_TOKEN` (publishes would
+otherwise never refresh the public site). Local development may still leave
+revalidate env empty, use empty `DB_PASSWORD`, and the example secret from
+`backend/.env.example`.
 
 ---
 

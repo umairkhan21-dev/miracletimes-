@@ -1,4 +1,4 @@
-# Contabo deployment plan — Miracle Times only
+# Contabo deployment plan — Miracle Times only (SSR / ISR)
 
 This plan targets the Contabo VPS (`Ubuntu 24.04`, `Nginx`, `Node.js 20+` / `24`)
 for **Miracle Times**. It must not modify Miracle Drugs vhosts, databases, or
@@ -11,126 +11,128 @@ window.** Templates live under `deploy/contabo/` in this repo.
 
 | Role | Host / path |
 |---|---|
-| Public site (static `out/`) | `https://miracletimes.in` → Nginx → `/var/www/miracletimes/out` |
-| API + uploads | `https://api.miracletimes.in` → Nginx → `127.0.0.1:4000` |
-| Rebuild webhook | Nginx `/hooks/rebuild` → `127.0.0.1:4010` (`rebuild-webhook.mjs`) |
+| Public site (Next.js SSR/ISR) | `https://miracletimes.in` → Nginx → `127.0.0.1:3000` |
+| API + uploads (local media fallback) | `https://api.miracletimes.in` → Nginx → `127.0.0.1:4000` |
 | MySQL | Localhost only (not public) |
+| Object storage (optional) | S3-compatible (R2 / Contabo Object Storage) via env |
 | Miracle Drugs | **Unchanged** separate Nginx server blocks / paths |
 
 ```
 Internet
    │
-   ├─ miracletimes.in ──Nginx── /var/www/miracletimes/out
-   │                         └─ /hooks/rebuild ──► 127.0.0.1:4010
-   └─ api.miracletimes.in ──Nginx──► 127.0.0.1:4000 (Node API)
+   ├─ miracletimes.in ──Nginx──► 127.0.0.1:3000 (next start)
+   └─ api.miracletimes.in ──Nginx──► 127.0.0.1:4000 (Express API)
 ```
 
-## Verified publishing + rebuild process
+Static `out/` + `/hooks/rebuild` are **retired**. Publishing no longer runs
+`npm run build:export`.
 
-Admin SEO / content changes do **not** appear on the public site until a
-successful static export lands in Nginx’s document root.
+## Verified publishing + cache revalidation
 
-### What triggers a rebuild (API)
+Admin SEO / content changes appear after MySQL commit + on-demand Next.js
+revalidation (debounced). No full site rebuild.
 
-The API queues `FRONTEND_DEPLOY_HOOK_URL` (debounced, default **45s**) when:
+### What triggers revalidation (API)
 
-| Action | Rebuild? |
+The API queues `CACHE_REVALIDATE_URL` (debounced, default **5s**) when:
+
+| Action | Revalidate? |
 |---|---|
 | Publish draft → published | Yes |
 | Update a **published** article (including SEO title/description only) | Yes |
 | Archive / delete a previously published article | Yes |
 | Create as draft / update draft only | No |
-| Schedule for later | No (rebuild runs when the scheduler publishes) |
+| Schedule for later | No (runs when the scheduler publishes) |
 
-### Contabo webhook behavior (`deploy/contabo/rebuild-webhook.mjs`)
+### Revalidation endpoint
 
-1. Listens on **127.0.0.1 only** (never public).
-2. Requires `REBUILD_HOOK_TOKEN` via `?token=` or `X-Rebuild-Token` (timing-safe compare).
-3. Debounces bursts (`REBUILD_DEBOUNCE_MS`, default 5s) in addition to the API debounce.
-4. While a build is running, further hooks set **re-run-after-current** so updates are not dropped.
-5. Runs `npm ci` (optional skip via `REBUILD_SKIP_NPM_CI=1`), then `npm run build:export` with production `NEXT_PUBLIC_API_URL`.
-6. Publishes via staging `rsync` into `SITE_OUT_DIR` (`--delete` on final sync).
-7. Failures append to `deploy/contabo/logs/rebuild-failures.log` (and stdout for journald).
-8. `GET /health` reports `busy`, `lastSuccessAt`, `lastError`.
+- Next Route Handler: `POST /api/revalidate`
+- Auth: header `X-Revalidate-Token` (timing-safe); **not** query-string tokens
+- Body: `{ reason, tags[], paths[] }`
+- Production API should call **loopback**:
+  `CACHE_REVALIDATE_URL=http://127.0.0.1:3000/api/revalidate`
+- Shared secret: `CACHE_REVALIDATE_TOKEN` (API) and `REVALIDATE_TOKEN` (Next `web.env`)
 
 ### End-to-end editor workflow
 
 1. Editor sets Hindi/English **SEO title / SEO description** (optional) and content → Save / Publish.
-2. API writes `article_translations.seo_title` / `seo_description` and article body.
-3. If the article is public-facing, API debounces → `POST` rebuild hook.
-4. Webhook exports static HTML. Each `/news/{slug}/` page includes:
-   - `<title>`, meta description, canonical, Open Graph, Twitter, NewsArticle JSON-LD from admin SEO (with headline/summary fallbacks)
-   - **Full article body**, headline, author, and dates in the initial HTML (not JS-only)
-5. Nginx serves the new `out/` tree. Google reads tags + body without waiting for client JS.
-6. Language toggle still works client-side by navigating/fetching the sibling translation.
+2. API writes translations + body to MySQL.
+3. If public-facing, API debounces → `POST` revalidate with article/category/home/sitemap tags.
+4. Next serves fresh HTML on the next request. Each `/news/{slug}/` response includes:
+   - `<title>`, meta description, canonical, Open Graph, Twitter, NewsArticle JSON-LD
+   - **Full article body**, headline, author, and dates in the initial HTML
+5. Language toggle still works client-side by navigating/fetching the sibling translation.
 
 ### Local verification (no Contabo)
-
-With the API running locally:
 
 ```bash
 # Backend on :4001
 cd backend && npm start
 
-# From repo root — export + SEO regression suite
-npm run test:rebuild-smoke
-```
+# From repo root — production-like SSR
+REVALIDATE_TOKEN=local-dev-revalidate-token-32chars-min npm run build
+REVALIDATE_TOKEN=local-dev-revalidate-token-32chars-min npm run start
 
-This updates local `out/` only. It does not rsync to Contabo.
+# Smoke (expects API + Next running)
+REVALIDATE_TOKEN=local-dev-revalidate-token-32chars-min npm run test:ssr-smoke
+```
 
 ## One-time server prep (operator)
 
 1. Create system user `miracletimes` and directories:
    - `/opt/miracletimes` (app checkout)
-   - `/var/www/miracletimes/out` (web root)
-   - `/var/lib/miracletimes/uploads`
+   - `/var/lib/miracletimes/uploads` (legacy/local media; keep existing files)
    - `/etc/miracle-times/` (env files, mode `0640`, owner `root:miracletimes`)
    - `/var/backups/miracletimes`
-2. Install Node **20 LTS or 24**, MySQL, Nginx, Certbot, `rsync`.
+2. Install Node **20 LTS or 24**, MySQL, Nginx, Certbot.
 3. Create MySQL database/user for Miracle Times only (not shared with other apps).
 4. Clone this repo to `/opt/miracletimes` and `npm ci` in root + `backend/`.
 5. Copy env templates:
    - `/etc/miracle-times/api.env` from `backend/.env.example` (production values)
-   - `/etc/miracle-times/rebuild.env` (see below)
+   - `/etc/miracle-times/web.env` (Next.js — see below)
 6. Set production API env highlights:
    - `NODE_ENV=production`
-   - `LISTEN_HOST=127.0.0.1` (defaulted by code if unset)
+   - `LISTEN_HOST=127.0.0.1`
    - `FRONTEND_URL=https://miracletimes.in`
    - `CORS_ORIGINS=https://miracletimes.in,https://www.miracletimes.in`
    - `PUBLIC_BASE_URL=https://api.miracletimes.in`
    - `UPLOAD_DIR=/var/lib/miracletimes/uploads`
-   - `FRONTEND_DEPLOY_HOOK_URL=https://miracletimes.in/hooks/rebuild?token=<REBUILD_HOOK_TOKEN>`
+   - `CACHE_REVALIDATE_URL=http://127.0.0.1:3000/api/revalidate/`
+   - `CACHE_REVALIDATE_TOKEN=<same as web REVALIDATE_TOKEN>`
+   - `STORAGE_PROVIDER=local` until S3/R2 credentials are ready
    - Strong `JWT_SECRET` / `DB_PASSWORD` (never commit)
-7. Install systemd units from `deploy/contabo/*.service`.
+7. Install systemd units:
+   - `deploy/contabo/miracle-times-api.service`
+   - `deploy/contabo/miracle-times-web.service`
+   - Do **not** install `miracle-times-rebuild.service` (obsolete)
 8. Install Nginx site files from `deploy/contabo/nginx-*.conf` **as new site files** —
    do not overwrite Miracle Drugs configs. Declare `limit_req_zone` once in `http {}`.
 9. Issue TLS certs for `miracletimes.in` and `api.miracletimes.in`.
 10. Seed admin: `cd /opt/miracletimes/backend && npm run seed:admin -- …`
-11. Enable firewall: `80/443` public; SSH restricted; **deny** Node ports `4000`/`4010` and MySQL `3306` publicly.
+11. Enable firewall: `80/443` public; SSH restricted; **deny** Node ports `3000`/`4000` and MySQL `3306` publicly.
 12. Schedule `deploy/contabo/backup.sh` via cron; copy backups off-box; restore-drill on staging.
+13. Optional later: set `STORAGE_PROVIDER=s3` + R2/Contabo Object Storage env — **do not migrate/delete existing local media**.
 
-### `rebuild.env` example (names only)
+### `web.env` example (names only)
 
 ```bash
-REBUILD_HOOK_TOKEN=generate-with-openssl-rand-hex-32
-REBUILD_LISTEN_PORT=4010
-REPO_DIR=/opt/miracletimes
-SITE_OUT_DIR=/var/www/miracletimes/out
+NODE_ENV=production
+PORT=3000
 NEXT_PUBLIC_API_URL=https://api.miracletimes.in
-REBUILD_DEBOUNCE_MS=5000
-# REBUILD_SKIP_NPM_CI=1
-# REBUILD_LOG_DIR=/var/log/miracle-times
+REVALIDATE_TOKEN=generate-with-openssl-rand-hex-32
+# Optional CDN/image hosts for next/image remotePatterns:
+# NEXT_IMAGE_REMOTE_HOSTS=cdn.miracletimes.in,pub-xxxx.r2.dev
 ```
 
 ## Resource / performance notes
 
 | Concern | Guidance |
 |---|---|
-| CPU / RAM | Full `npm ci` + Next export is heavy; debounce + single-flight builds avoid pile-ups |
-| Disk | Staging + live `out/` briefly coexist during rsync |
-| Overlap | Webhook never runs two exports in parallel; queued re-run covers mid-build edits |
-| Security | Token + loopback bind + Nginx TLS; failure logs must not contain the raw token |
-| Miracle Drugs | Separate Nginx roots; rebuild paths are Miracle Times only |
+| CPU / RAM | Steady Next + API (~2–3 GB planning estimate); ISR + short revalidate windows reduce origin work |
+| Disk | App + MySQL + logs; media should move off-box when S3 is enabled |
+| Overlap | Debounced revalidation coalesces burst edits |
+| Security | Loopback revalidate + shared secret header; Nginx allowlist for `/api/revalidate` |
+| Miracle Drugs | Separate Nginx roots/units; MemoryMax/CPUQuota on MT units |
 
 ## Verification checklist (after you approve go-live)
 
@@ -138,12 +140,11 @@ REBUILD_DEBOUNCE_MS=5000
 curl -sI https://miracletimes.in/ | grep -iE 'content-security-policy|strict-transport|x-frame'
 curl -sI https://api.miracletimes.in/api/health
 curl -s https://miracletimes.in/robots.txt | grep -E 'Disallow|Sitemap'
-curl -s https://127.0.0.1:4010/health   # on the VPS only
-ss -lntp | grep -E '4000|4010'   # should show 127.0.0.1 only
+ss -lntp | grep -E '3000|4000'   # should show 127.0.0.1 only
 ```
 
 After publishing a test article with a unique SEO title, confirm that string appears in
-`curl -s https://miracletimes.in/news/<slug>/ | head` once the rebuild finishes.
+`curl -s https://miracletimes.in/news/<slug>/ | head` **without** running a rebuild.
 
 Confirm Miracle Drugs vhosts still respond unchanged.
 
@@ -153,6 +154,17 @@ Confirm Miracle Drugs vhosts still respond unchanged.
 |---|---|
 | JWT revocation | In-process denylist (single API process). Not shared across multiple Node replicas. |
 | CSP | `script-src` still allows `'unsafe-inline'` for JSON-LD; language boot is external `/lang-boot.js`. |
-| Rebuild token | In HTTPS URL query. Protect with TLS + long random token; rotate if leaked. |
-| Headers | Enforced by Nginx templates, not Next `headers()`. |
-| Article HTML | Body is server-rendered into static export for the slug’s language; other language still client-fetched on toggle. |
+| Revalidate token | Header-only shared secret (not query string). Prefer loopback URL from API. |
+| Headers | Next `headers()` + Nginx HSTS/frame options. |
+| Article HTML | Body is server-rendered for the slug’s language; other language still client-fetched on toggle. |
+| Media | `STORAGE_PROVIDER=local` until S3 configured; existing uploads preserved. |
+
+## Obsolete (do not re-enable on Contabo)
+
+| Path | Status |
+|---|---|
+| `deploy/contabo/rebuild-webhook.mjs` | Obsolete — kept for rollback reference |
+| `deploy/contabo/miracle-times-rebuild.service` | Obsolete |
+| Nginx `root …/out` + `/hooks/rebuild` | Replaced by Next upstream |
+| `npm run build:export` / `STATIC_EXPORT=1` | Retired for production |
+| `docs/STATIC_DEPLOYMENT.md` | Historical |

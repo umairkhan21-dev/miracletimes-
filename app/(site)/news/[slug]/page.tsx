@@ -19,11 +19,11 @@ import {
   seoHtmlLang,
 } from "@/lib/seo";
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 
 type Props = { params: Promise<{ slug: string }> };
 
-// Literal required by Next. Keep `true` for local preview of new articles.
-// `npm run build:export` temporarily sets this to `false` for static export.
+export const revalidate = 300;
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
@@ -41,16 +41,10 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const isStaticExport = process.env.STATIC_EXPORT === "1";
 
   try {
     const loaded = await loadArticleForMetadata(slug);
     if (!loaded) {
-      if (isStaticExport) {
-        throw new Error(
-          `STATIC_EXPORT could not load article metadata for slug "${slug}".`,
-        );
-      }
       return { title: "खबर नहीं मिली" };
     }
 
@@ -110,10 +104,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         language: seoHtmlLang(language),
       },
     };
-  } catch (error) {
-    if (isStaticExport) {
-      throw error;
-    }
+  } catch {
     return { title: "खबर नहीं मिली" };
   }
 }
@@ -121,25 +112,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function NewsArticlePage({ params }: Props) {
   const { slug } = await params;
   const bundle = await loadArticlePageBundle(slug).catch(() => null);
-  const article = bundle?.article ?? null;
-  const language = bundle?.language ?? "hi";
+  if (!bundle?.article) {
+    notFound();
+  }
+
+  const article = bundle.article;
+  const language = bundle.language;
 
   return (
     <>
-      {article ? (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: JSON.stringify(
-              buildArticleJsonLd({
-                article,
-                language,
-                section: categoryName(article.category, language),
-              }),
-            ).replace(/</g, "\\u003c"),
-          }}
-        />
-      ) : null}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(
+            buildArticleJsonLd({
+              article,
+              language,
+              section: categoryName(article.category, language),
+            }),
+          ).replace(/</g, "\\u003c"),
+        }}
+      />
       <ArticleDetail slug={slug} initialBundle={bundle} />
     </>
   );

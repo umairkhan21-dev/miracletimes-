@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 /**
+ * OBSOLETE — retained for emergency rollback only.
+ * Miracle Times now uses Next.js SSR + POST /api/revalidate.
+ * Do not install miracle-times-rebuild.service on Contabo for new deploys.
+ *
  * Contabo rebuild webhook for Miracle Times static export.
  * Listens on 127.0.0.1 only. Nginx proxies /hooks/rebuild → this process.
  *

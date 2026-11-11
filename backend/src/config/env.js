@@ -90,15 +90,31 @@ function parseEnv(raw = process.env) {
       // Empty in production → forced to 127.0.0.1 (Nginx reverse-proxy safe).
       // Set LISTEN_HOST=0.0.0.0 explicitly only when a PaaS requires it.
       LISTEN_HOST: z.string().optional().default(""),
-      // Required HTTPS rebuild webhook in production (Contabo rebuild hook or
-      // any HTTPS endpoint that triggers `npm run build:export` + publish).
-      // Leave empty in development so local publishes do not fire deploys.
+      // On-demand Next.js cache revalidation (replaces static-export rebuild hook).
+      // Production requires both URL + shared secret. Leave empty in development.
+      CACHE_REVALIDATE_URL: z.string().optional().default(""),
+      CACHE_REVALIDATE_TOKEN: z.string().optional().default(""),
+      CACHE_REVALIDATE_DEBOUNCE_MS: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(5_000),
+      // Deprecated alias — if set, maps to CACHE_REVALIDATE_URL for migration.
       FRONTEND_DEPLOY_HOOK_URL: z.string().optional().default(""),
       FRONTEND_DEPLOY_DEBOUNCE_MS: z.coerce
         .number()
         .int()
         .positive()
-        .default(45_000),
+        .optional(),
+      // Media storage: local (default) or s3 (R2 / Contabo Object Storage / AWS).
+      STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+      S3_ENDPOINT: z.string().optional().default(""),
+      S3_REGION: z.string().optional().default("auto"),
+      S3_BUCKET: z.string().optional().default(""),
+      S3_ACCESS_KEY_ID: z.string().optional().default(""),
+      S3_SECRET_ACCESS_KEY: z.string().optional().default(""),
+      S3_PUBLIC_BASE_URL: z.string().optional().default(""),
+      S3_FORCE_PATH_STYLE: z.string().optional().default("true"),
     })
     .superRefine((data, ctx) => {
       try {
@@ -124,17 +140,45 @@ function parseEnv(raw = process.env) {
         });
       }
 
-      const hook = (data.FRONTEND_DEPLOY_HOOK_URL || "").trim();
-      if (hook && !isHttpsUrl(hook) && !/^http:\/\/localhost(?::\d+)?(?:\/|$)/i.test(hook)) {
+      const revalidateUrl = (
+        data.CACHE_REVALIDATE_URL ||
+        data.FRONTEND_DEPLOY_HOOK_URL ||
+        ""
+      ).trim();
+      if (
+        revalidateUrl &&
+        !isHttpsUrl(revalidateUrl) &&
+        !/^http:\/\/(localhost|127\.0\.0\.1)(?::\d+)?(?:\/|$)/i.test(
+          revalidateUrl,
+        )
+      ) {
         try {
           // eslint-disable-next-line no-new
-          new URL(hook);
+          new URL(revalidateUrl);
         } catch {
           ctx.addIssue({
             code: "custom",
-            path: ["FRONTEND_DEPLOY_HOOK_URL"],
-            message: "FRONTEND_DEPLOY_HOOK_URL must be a valid URL when set",
+            path: ["CACHE_REVALIDATE_URL"],
+            message: "CACHE_REVALIDATE_URL must be a valid URL when set",
           });
+        }
+      }
+
+      if (data.STORAGE_PROVIDER === "s3") {
+        for (const key of [
+          "S3_ENDPOINT",
+          "S3_BUCKET",
+          "S3_ACCESS_KEY_ID",
+          "S3_SECRET_ACCESS_KEY",
+          "S3_PUBLIC_BASE_URL",
+        ]) {
+          if (!String(data[key] || "").trim()) {
+            ctx.addIssue({
+              code: "custom",
+              path: [key],
+              message: `${key} is required when STORAGE_PROVIDER=s3`,
+            });
+          }
         }
       }
 
@@ -184,19 +228,39 @@ function parseEnv(raw = process.env) {
         });
       }
 
-      // Static export architecture: publishes only go live after a rebuild.
-      if (!hook) {
+      // SSR architecture: publishes go live via secure cache revalidation.
+      if (!revalidateUrl) {
         ctx.addIssue({
           code: "custom",
-          path: ["FRONTEND_DEPLOY_HOOK_URL"],
+          path: ["CACHE_REVALIDATE_URL"],
           message:
-            "FRONTEND_DEPLOY_HOOK_URL is required in production (Vercel Deploy Hook HTTPS URL)",
+            "CACHE_REVALIDATE_URL is required in production (Next.js /api/revalidate HTTPS URL)",
         });
-      } else if (!isHttpsUrl(hook)) {
+      } else if (
+        !isHttpsUrl(revalidateUrl) &&
+        !/^http:\/\/127\.0\.0\.1(?::\d+)?(?:\/|$)/i.test(revalidateUrl)
+      ) {
+        // Allow loopback HTTP only for same-host Nginx→Next on Contabo.
         ctx.addIssue({
           code: "custom",
-          path: ["FRONTEND_DEPLOY_HOOK_URL"],
-          message: "FRONTEND_DEPLOY_HOOK_URL must use https:// in production",
+          path: ["CACHE_REVALIDATE_URL"],
+          message:
+            "CACHE_REVALIDATE_URL must use https:// in production (or http://127.0.0.1 for local Next)",
+        });
+      }
+
+      if (!String(data.CACHE_REVALIDATE_TOKEN || "").trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["CACHE_REVALIDATE_TOKEN"],
+          message:
+            "CACHE_REVALIDATE_TOKEN is required in production (shared secret for X-Revalidate-Token)",
+        });
+      } else if (String(data.CACHE_REVALIDATE_TOKEN).trim().length < 32) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["CACHE_REVALIDATE_TOKEN"],
+          message: "CACHE_REVALIDATE_TOKEN must be at least 32 characters",
         });
       }
     });
@@ -279,11 +343,30 @@ function parseEnv(raw = process.env) {
     listenHostRaw ||
     (data.NODE_ENV === "production" ? "127.0.0.1" : "");
 
+  const cacheRevalidateUrl = (
+    data.CACHE_REVALIDATE_URL ||
+    data.FRONTEND_DEPLOY_HOOK_URL ||
+    ""
+  ).trim();
+  const cacheRevalidateToken = (data.CACHE_REVALIDATE_TOKEN || "").trim();
+  const cacheRevalidateDebounceMs =
+    data.FRONTEND_DEPLOY_DEBOUNCE_MS ||
+    data.CACHE_REVALIDATE_DEBOUNCE_MS ||
+    5_000;
+
   return {
     success: true,
     data: {
       ...data,
-      FRONTEND_DEPLOY_HOOK_URL: (data.FRONTEND_DEPLOY_HOOK_URL || "").trim(),
+      CACHE_REVALIDATE_URL: cacheRevalidateUrl,
+      CACHE_REVALIDATE_TOKEN: cacheRevalidateToken,
+      CACHE_REVALIDATE_DEBOUNCE_MS: cacheRevalidateDebounceMs,
+      // Deprecated alias kept for older docs/tests during migration.
+      FRONTEND_DEPLOY_HOOK_URL: cacheRevalidateUrl,
+      FRONTEND_DEPLOY_DEBOUNCE_MS: cacheRevalidateDebounceMs,
+      S3_FORCE_PATH_STYLE:
+        String(data.S3_FORCE_PATH_STYLE || "true") !== "false" &&
+        String(data.S3_FORCE_PATH_STYLE || "true") !== "0",
       LISTEN_HOST: listenHost,
       corsOrigins,
       isProduction: data.NODE_ENV === "production",

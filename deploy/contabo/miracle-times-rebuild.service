@@ -1,5 +1,6 @@
 [Unit]
-Description=Miracle Times static rebuild webhook
+# OBSOLETE — do not enable for SSR deploys. Use miracle-times-web.service instead.
+Description=Miracle Times static rebuild webhook (obsolete)
 After=network.target
 
 [Service]

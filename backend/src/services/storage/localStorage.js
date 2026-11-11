@@ -6,7 +6,7 @@ async function ensureUploadDir() {
   await fs.mkdir(env.uploadPath, { recursive: true });
 }
 
-async function saveBuffer(buffer, storageKey) {
+async function saveBuffer(buffer, storageKey, _options = {}) {
   await ensureUploadDir();
   const absolute = path.join(env.uploadPath, storageKey);
   await fs.mkdir(path.dirname(absolute), { recursive: true });

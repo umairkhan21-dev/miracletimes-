@@ -282,17 +282,41 @@ export async function loadArticles(language: Locale): Promise<Article[]> {
   }
 }
 
+/**
+ * Load homepage shelves with bounded API pages (not a full archive scrape).
+ * Enough for lead/supporting/sections while staying SSR-friendly for years of data.
+ */
 export async function loadHomepageBundle(language: Locale) {
   let articles: Article[] = [];
   let breaking: Article[] = [];
   let trending: Article[] = [];
 
   try {
-    [articles, breaking, trending] = await Promise.all([
-      fetchAllArticles({ language }),
-      fetchBreakingArticles(language, 8),
-      fetchTrendingArticles(language, 8),
-    ]);
+    const categoryFetches = sectionDefs.map((section) =>
+      fetchArticles({
+        language,
+        category: section.categories[0],
+        page: 1,
+        limit: 8,
+      }).then((result) => result.articles),
+    );
+
+    const [latestPage, breakingList, trendingList, ...categoryLists] =
+      await Promise.all([
+        fetchArticles({ language, page: 1, limit: 40 }),
+        fetchBreakingArticles(language, 8),
+        fetchTrendingArticles(language, 8),
+        ...categoryFetches,
+      ]);
+
+    const byId = new Map<string, Article>();
+    for (const article of latestPage.articles) byId.set(article.id, article);
+    for (const list of categoryLists) {
+      for (const article of list) byId.set(article.id, article);
+    }
+    articles = sortByPublishedDesc(Array.from(byId.values()));
+    breaking = breakingList;
+    trending = trendingList;
   } catch {
     articles = [];
     breaking = [];
@@ -312,12 +336,71 @@ export async function loadHomepageBundle(language: Locale) {
 export async function loadArticlesByCategory(
   language: Locale,
   categorySlug: string,
+  options: { page?: number; limit?: number; all?: boolean } = {},
 ) {
   try {
-    return await fetchAllArticles({ language, category: categorySlug });
+    if (options.all) {
+      return await fetchAllArticles({ language, category: categorySlug });
+    }
+    const { articles } = await fetchArticles({
+      language,
+      category: categorySlug,
+      page: options.page ?? 1,
+      limit: options.limit ?? 40,
+    });
+    return articles;
   } catch {
     return [];
   }
+}
+
+export async function loadLatestArticles(
+  language: Locale,
+  options: { page?: number; limit?: number } = {},
+) {
+  try {
+    const { articles, meta } = await fetchArticles({
+      language,
+      page: options.page ?? 1,
+      limit: options.limit ?? 40,
+    });
+    return { articles, meta };
+  } catch {
+    return {
+      articles: [] as Article[],
+      meta: undefined,
+    };
+  }
+}
+
+export async function loadArchiveArticles(
+  language: Locale,
+  options: {
+    page?: number;
+    limit?: number;
+    year?: number;
+    month?: number;
+  } = {},
+) {
+  // Archive uses the public list endpoint; year/month filtering is applied
+  // client/server-side on the returned page until a dedicated API filter ships.
+  const { articles, meta } = await loadLatestArticles(language, {
+    page: options.page ?? 1,
+    limit: options.limit ?? 24,
+  });
+
+  const year = options.year;
+  const month = options.month;
+  if (!year) return { articles, meta };
+
+  const filtered = articles.filter((article) => {
+    const date = new Date(article.publishedAt);
+    if (Number.isNaN(date.getTime())) return false;
+    if (date.getUTCFullYear() !== year) return false;
+    if (month && date.getUTCMonth() + 1 !== month) return false;
+    return true;
+  });
+  return { articles: filtered, meta };
 }
 
 export async function searchArticlesRemote(language: Locale, query: string) {

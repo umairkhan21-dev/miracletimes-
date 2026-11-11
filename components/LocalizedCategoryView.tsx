@@ -13,29 +13,49 @@ import {
   getCategory,
 } from "@/lib/categories";
 import { loadArticlesByCategory } from "@/lib/content";
+import type { Locale } from "@/lib/i18n/config";
 import { demoPath } from "@/lib/paths";
 import type { Article } from "@/lib/types";
 import { useEffect, useState } from "react";
 
 export function LocalizedCategoryView({
   slug,
-  pageSize = 2,
+  pageSize = 12,
+  initialLocale,
+  initialArticles,
 }: {
   slug: string;
   pageSize?: number;
+  initialLocale?: Locale;
+  initialArticles?: Article[];
 }) {
   const { locale, t } = useI18n();
   const category = getCategory(slug);
+  const hasServerArticles =
+    Array.isArray(initialArticles) &&
+    (!initialLocale || initialLocale === locale);
+
   const [status, setStatus] = useState<"loading" | "ready" | "error">(
-    "loading",
+    hasServerArticles ? "ready" : "loading",
   );
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<Article[]>(
+    hasServerArticles ? initialArticles! : [],
+  );
 
   useEffect(() => {
     let cancelled = false;
+
+    if (Array.isArray(initialArticles) && initialLocale === locale) {
+      setArticles(initialArticles);
+      setStatus("ready");
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setStatus("loading");
 
-    loadArticlesByCategory(locale, slug)
+    loadArticlesByCategory(locale, slug, { limit: 60 })
       .then((items) => {
         if (cancelled) return;
         setArticles(items);
@@ -53,7 +73,7 @@ export function LocalizedCategoryView({
     return () => {
       cancelled = true;
     };
-  }, [locale, slug]);
+  }, [locale, slug, initialArticles, initialLocale]);
 
   if (!category) return null;
 

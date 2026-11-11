@@ -1,3 +1,7 @@
+import {
+  CACHE_TAGS,
+  REVALIDATE_SECONDS,
+} from "@/lib/cacheTags";
 import type { Locale } from "@/lib/i18n/config";
 import type { Article, Category, ContentBlock } from "@/lib/types";
 
@@ -154,20 +158,30 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return text ? `?${text}` : "";
 }
 
+type ApiGetOptions = RequestInit & {
+  next?: {
+    revalidate?: number | false;
+    tags?: string[];
+  };
+};
+
 async function apiGet<T>(
   path: string,
   query: Record<string, string | number | boolean | undefined> = {},
-  init?: RequestInit,
+  init?: ApiGetOptions,
 ): Promise<{ data: T; meta?: ApiMeta }> {
   const url = `${getApiBaseUrl()}/api${path}${buildQuery(query)}`;
 
-  // Browser: always fresh. Build/SSR: `force-cache` so `output: "export"` can
-  // statically prerender. `scripts/static-export-build.mjs` deletes
-  // `.next/cache/fetch-cache` before each export so published slugs/metadata
-  // are not reused across builds. Do not switch this to `no-store` — that opts
-  // the route into dynamic rendering and breaks static export metadata.
-  const defaultCache: RequestCache =
-    typeof window === "undefined" ? "force-cache" : "no-store";
+  // Browser: always fresh. Server: tagged ISR cache (revalidated by
+  // POST /api/revalidate after admin publish/update/archive/delete).
+  const isServer = typeof window === "undefined";
+  const defaultCache: RequestCache = isServer ? "force-cache" : "no-store";
+  const nextOptions = isServer
+    ? {
+        revalidate: init?.next?.revalidate ?? REVALIDATE_SECONDS.listing,
+        tags: init?.next?.tags ?? [CACHE_TAGS.articles],
+      }
+    : undefined;
 
   let response: Response;
   try {
@@ -178,6 +192,7 @@ async function apiGet<T>(
         ...(init?.headers ?? {}),
       },
       cache: init?.cache ?? defaultCache,
+      ...(nextOptions ? { next: nextOptions } : {}),
     });
   } catch {
     throw new ApiError(
@@ -216,16 +231,31 @@ export async function fetchArticles(
     };
   }
 
-  const { data, meta } = await apiGet<ApiArticle[]>("/articles", {
-    language: params.language ?? "hi",
-    page: params.page ?? 1,
-    limit: params.limit ?? 20,
-    category: params.category,
-    tag: params.tag,
-    featured: params.featured,
-    breaking: params.breaking,
-    q: params.q,
-  });
+  const tags = [
+    CACHE_TAGS.articles,
+    ...(params.category ? [CACHE_TAGS.category(params.category)] : []),
+    ...(params.breaking || params.featured ? [CACHE_TAGS.home] : []),
+  ];
+
+  const { data, meta } = await apiGet<ApiArticle[]>(
+    "/articles",
+    {
+      language: params.language ?? "hi",
+      page: params.page ?? 1,
+      limit: params.limit ?? 20,
+      category: params.category,
+      tag: params.tag,
+      featured: params.featured,
+      breaking: params.breaking,
+      q: params.q,
+    },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.listing,
+        tags,
+      },
+    },
+  );
 
   return {
     articles: (Array.isArray(data) ? data : []).map(normalizeArticle),
@@ -262,6 +292,12 @@ export async function fetchArticleBySlug(
   const { data } = await apiGet<ApiArticle>(
     `/articles/${encodeURIComponent(slug)}`,
     { language },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.article,
+        tags: [CACHE_TAGS.articles, CACHE_TAGS.article(slug)],
+      },
+    },
   );
   return normalizeArticle(data);
 }
@@ -310,10 +346,16 @@ export async function fetchFeaturedArticles(
   limit = 10,
 ): Promise<Article[]> {
   if (!isApiConfigured()) return [];
-  const { data } = await apiGet<ApiArticle[]>("/articles/featured", {
-    language,
-    limit,
-  });
+  const { data } = await apiGet<ApiArticle[]>(
+    "/articles/featured",
+    { language, limit },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.home,
+        tags: [CACHE_TAGS.home, CACHE_TAGS.articles],
+      },
+    },
+  );
   return (Array.isArray(data) ? data : []).map(normalizeArticle);
 }
 
@@ -322,10 +364,16 @@ export async function fetchBreakingArticles(
   limit = 8,
 ): Promise<Article[]> {
   if (!isApiConfigured()) return [];
-  const { data } = await apiGet<ApiArticle[]>("/articles/breaking", {
-    language,
-    limit,
-  });
+  const { data } = await apiGet<ApiArticle[]>(
+    "/articles/breaking",
+    { language, limit },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.home,
+        tags: [CACHE_TAGS.home, CACHE_TAGS.articles],
+      },
+    },
+  );
   return (Array.isArray(data) ? data : []).map(normalizeArticle);
 }
 
@@ -334,10 +382,16 @@ export async function fetchTrendingArticles(
   limit = 8,
 ): Promise<Article[]> {
   if (!isApiConfigured()) return [];
-  const { data } = await apiGet<ApiArticle[]>("/articles/trending", {
-    language,
-    limit,
-  });
+  const { data } = await apiGet<ApiArticle[]>(
+    "/articles/trending",
+    { language, limit },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.home,
+        tags: [CACHE_TAGS.home, CACHE_TAGS.articles],
+      },
+    },
+  );
   return (Array.isArray(data) ? data : []).map(normalizeArticle);
 }
 
@@ -359,11 +413,17 @@ export async function fetchCategoryBySlug(
   const { data } = await apiGet<ApiCategory>(
     `/categories/${encodeURIComponent(slug)}`,
     { language },
+    {
+      next: {
+        revalidate: REVALIDATE_SECONDS.listing,
+        tags: [CACHE_TAGS.category(slug)],
+      },
+    },
   );
   return normalizeCategory(data);
 }
 
-/** Collect published slugs for both languages (static export paths). */
+/** Collect published slugs for both languages (optional prerender / sitemap). */
 export async function fetchPublishedSlugs(): Promise<string[]> {
   if (!isApiConfigured()) return [];
 

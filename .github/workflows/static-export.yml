@@ -1,53 +1,14 @@
-# Manual / repository_dispatch rebuild of the Miracle Times static frontend.
-# Primary automation: API posts to a Vercel Deploy Hook (FRONTEND_DEPLOY_HOOK_URL).
-# Use this workflow for manual rebuilds or as an alternate trigger path.
-name: Static export rebuild
+# OBSOLETE — replaced by ssr-ci.yml. Retained disabled for rollback reference.
+name: Static export rebuild (obsolete)
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [frontend-rebuild]
 
 jobs:
-  export:
+  obsolete:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Static export
-        env:
-          # Must be the production HTTPS API so OG images and article data are live.
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-          STATIC_EXPORT: "1"
-        run: npm run build:export
-
-      - name: SEO verification
-        run: npm run test:seo
-
-      # Optional: push the out/ artifact to a host that is not Vercel.
-      # When using Vercel Deploy Hooks, this job is usually unnecessary —
-      # keep it for CI verification or non-Vercel hosts.
-      - name: Upload static export artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: miracletimes-static-export
-          path: out
-          if-no-files-found: error
+      - name: Retired
+        run: |
+          echo "Static export CI is obsolete. Use the SSR CI workflow."
+          exit 1

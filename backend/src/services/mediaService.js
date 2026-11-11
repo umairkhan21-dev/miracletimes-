@@ -264,7 +264,9 @@ async function uploadImage({ buffer, originalFilename, declaredMime, uploadedBy 
 
   const storageKey = buildStorageKey(inspected.mimeType, originalFilename);
   const storage = getStorageProvider();
-  const saved = await storage.saveBuffer(buffer, storageKey);
+  const saved = await storage.saveBuffer(buffer, storageKey, {
+    contentType: inspected.mimeType,
+  });
   const id = await insertMedia({
     fileUrl: saved.fileUrl,
     storageKey: saved.storageKey,

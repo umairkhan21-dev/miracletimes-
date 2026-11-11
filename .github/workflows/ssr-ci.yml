@@ -1,0 +1,49 @@
+# CI for Miracle Times self-hosted Next.js SSR (no static export).
+name: SSR CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: SEO unit tests
+        run: npm run test:seo
+
+      - name: Backend tests
+        run: npm test
+        working-directory: backend
+
+      - name: Next.js production build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:4001
+          REVALIDATE_TOKEN: ci-revalidate-token-not-for-production-use-32
+        run: npm run build

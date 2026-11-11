@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /**
+ * OBSOLETE — static export is retired. Use `npm run build` + `npm run start`.
+ * Kept only as an emergency rollback aid. Prefer scripts/ssr-seo-smoke.mjs.
+ *
  * Production static export.
  * Next.js forbids `dynamicParams: true` with `output: "export"`, but local
  * preview needs `true` for newly published article slugs. This script flips
