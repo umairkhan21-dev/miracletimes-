@@ -90,6 +90,9 @@ backend/uploads/**
 .next
 out
 
+# Contabo rebuild webhook local logs
+deploy/contabo/logs/
+
 # Nuxt.js build / generate output
 .nuxt
 dist

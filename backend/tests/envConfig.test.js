@@ -33,7 +33,17 @@ describe("production environment validation", () => {
       "https://miracletimes.in",
       "https://www.miracletimes.in",
     ]);
-    assert.equal(parsed.data.LISTEN_HOST, "");
+    // Production defaults to loopback when LISTEN_HOST is unset.
+    assert.equal(parsed.data.LISTEN_HOST, "127.0.0.1");
+  });
+
+  it("allows explicit 0.0.0.0 LISTEN_HOST in production for PaaS", () => {
+    const parsed = parseEnv({
+      ...baseProd,
+      LISTEN_HOST: "0.0.0.0",
+    });
+    assert.equal(parsed.success, true);
+    assert.equal(parsed.data.LISTEN_HOST, "0.0.0.0");
   });
 
   it("rejects weak JWT_SECRET in production", () => {

@@ -33,7 +33,7 @@ const list = asyncHandler(async (req, res) => {
 });
 
 const remove = asyncHandler(async (req, res) => {
-  await mediaService.deleteMedia(req.params.id);
+  await mediaService.deleteMedia(req.params.id, req.user);
   return ok(res, { deleted: true });
 });
 

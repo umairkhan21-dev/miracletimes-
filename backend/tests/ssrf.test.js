@@ -23,4 +23,25 @@ describe("SSRF URL checks", () => {
       (error) => error.statusCode === 400,
     );
   });
+
+  it("rejects CGNAT 100.64.0.0/10 addresses", async () => {
+    await assert.rejects(
+      () => assertSafeRemoteUrl("http://100.64.1.5/image.jpg"),
+      (error) => error.code === "SSRF_BLOCKED" || error.statusCode === 400,
+    );
+  });
+
+  it("rejects IPv4-mapped IPv6 loopback", async () => {
+    await assert.rejects(
+      () => assertSafeRemoteUrl("http://[::ffff:127.0.0.1]/image.jpg"),
+      (error) => error.code === "SSRF_BLOCKED" || error.statusCode === 400,
+    );
+  });
+
+  it("rejects link-local IPv6", async () => {
+    await assert.rejects(
+      () => assertSafeRemoteUrl("http://[fe80::1]/image.jpg"),
+      (error) => error.code === "SSRF_BLOCKED" || error.statusCode === 400,
+    );
+  });
 });

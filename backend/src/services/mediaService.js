@@ -39,17 +39,74 @@ function mapMedia(row) {
   };
 }
 
+function ipv4ToInt(ip) {
+  const parts = ip.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) {
+    return null;
+  }
+  return ((parts[0] << 24) >>> 0) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+}
+
+function ipv4InCidr(ip, cidr, prefix) {
+  const address = ipv4ToInt(ip);
+  const base = ipv4ToInt(cidr);
+  if (address == null || base == null) return false;
+  const mask = prefix === 0 ? 0 : ((0xffffffff << (32 - prefix)) >>> 0);
+  return (address & mask) === (base & mask);
+}
+
 function isPrivateIp(ip) {
   if (!ip) return true;
-  if (ip === "0.0.0.0" || ip === "::" || ip === "::1") return true;
-  if (ip.startsWith("127.") || ip.startsWith("10.") || ip.startsWith("192.168.")) {
+  const normalized = String(ip).toLowerCase().replace(/^\[|\]$/g, "");
+
+  if (
+    normalized === "0.0.0.0" ||
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized === "0:0:0:0:0:0:0:0" ||
+    normalized === "0:0:0:0:0:0:0:1"
+  ) {
     return true;
   }
-  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) return true;
-  if (ip.startsWith("169.254.") || ip.toLowerCase().startsWith("fe80:")) return true;
-  if (ip.startsWith("fc") || ip.startsWith("fd")) return true;
-  if (ip === "100.100.100.200") return true;
-  return false;
+
+  // IPv4-mapped IPv6 (::ffff:a.b.c.d)
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/i.exec(normalized);
+  if (mapped) return isPrivateIp(mapped[1]);
+
+  if (net.isIP(normalized) === 4) {
+    if (ipv4InCidr(normalized, "0.0.0.0", 8)) return true; // "this" network
+    if (ipv4InCidr(normalized, "10.0.0.0", 8)) return true;
+    if (ipv4InCidr(normalized, "127.0.0.0", 8)) return true;
+    if (ipv4InCidr(normalized, "169.254.0.0", 16)) return true;
+    if (ipv4InCidr(normalized, "172.16.0.0", 12)) return true;
+    if (ipv4InCidr(normalized, "192.168.0.0", 16)) return true;
+    if (ipv4InCidr(normalized, "100.64.0.0", 10)) return true; // CGNAT
+    if (ipv4InCidr(normalized, "192.0.0.0", 24)) return true;
+    if (ipv4InCidr(normalized, "192.0.2.0", 24)) return true; // TEST-NET-1
+    if (ipv4InCidr(normalized, "198.51.100.0", 24)) return true; // TEST-NET-2
+    if (ipv4InCidr(normalized, "203.0.113.0", 24)) return true; // TEST-NET-3
+    if (ipv4InCidr(normalized, "198.18.0.0", 15)) return true; // benchmarking
+    if (ipv4InCidr(normalized, "224.0.0.0", 4)) return true; // multicast
+    if (ipv4InCidr(normalized, "240.0.0.0", 4)) return true; // reserved
+    return false;
+  }
+
+  if (net.isIP(normalized) === 6) {
+    if (normalized === "::1") return true;
+    if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true; // ULA
+    if (normalized.startsWith("fe80:")) return true; // link-local
+    if (normalized.startsWith("ff")) return true; // multicast
+    if (
+      normalized.startsWith("2001:db8:") ||
+      normalized === "2001:db8::" ||
+      normalized.startsWith("2001:db8::")
+    ) {
+      return true; // documentation
+    }
+    return false;
+  }
+
+  return true;
 }
 
 async function assertSafeRemoteUrl(rawUrl) {
@@ -273,8 +330,21 @@ async function listMedia({ page = 1, limit = 20 } = {}) {
   };
 }
 
-async function deleteMedia(id) {
+async function deleteMedia(id, actor) {
   const media = await getMediaById(id);
+  const role = actor?.role;
+  const isPrivileged = role === "admin" || role === "editor";
+  const ownerId = media.uploadedBy == null ? null : Number(media.uploadedBy);
+  const actorId = actor?.id == null ? null : Number(actor.id);
+
+  // Authors may delete only their own uploads. Admin/editor may delete any.
+  // Legacy rows with null uploaded_by require admin/editor.
+  if (!isPrivileged) {
+    if (ownerId == null || actorId == null || ownerId !== actorId) {
+      throw new AppError("Insufficient permissions", 403, { code: "FORBIDDEN" });
+    }
+  }
+
   const refs = await query(
     "SELECT id FROM articles WHERE featured_image_id = ? LIMIT 1",
     [id],

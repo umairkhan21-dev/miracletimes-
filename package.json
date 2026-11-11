@@ -9,11 +9,12 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test:seo": "node --test scripts/verify-seo.mjs scripts/patch-html-lang.test.mjs"
+    "test:seo": "node --test scripts/verify-seo.mjs scripts/patch-html-lang.test.mjs",
+    "test:rebuild-smoke": "node scripts/local-rebuild-smoke.mjs"
   },
   "dependencies": {
     "mysql2": "^3.24.6",
-    "next": "^15.5.4",
+    "next": "15.5.29",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
@@ -23,7 +24,10 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "eslint": "^9.28.0",
-    "eslint-config-next": "^15.5.4",
+    "eslint-config-next": "15.5.29",
     "typescript": "^5.8.3"
+  },
+  "overrides": {
+    "postcss": "8.5.32"
   }
 }

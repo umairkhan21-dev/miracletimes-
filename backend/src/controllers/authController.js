@@ -18,6 +18,14 @@ const loginLimiter = rateLimit({
   },
 });
 
+function extractPresentedToken(req) {
+  const header = req.headers.authorization;
+  if (header && header.startsWith("Bearer ")) {
+    return header.slice(7).trim();
+  }
+  return req.cookies?.[env.COOKIE_NAME] || null;
+}
+
 const login = asyncHandler(async (req, res) => {
   const result = await authService.login(req.body.email, req.body.password);
   res.cookie(env.COOKIE_NAME, result.token, authService.cookieOptions());
@@ -25,7 +33,10 @@ const login = asyncHandler(async (req, res) => {
   return ok(res, { user: result.user });
 });
 
-const logout = asyncHandler(async (_req, res) => {
+const logout = asyncHandler(async (req, res) => {
+  const token = extractPresentedToken(req);
+  authService.revokeToken(token);
+
   const clearOptions = {
     httpOnly: true,
     secure: env.isProduction,

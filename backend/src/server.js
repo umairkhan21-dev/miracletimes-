@@ -22,8 +22,8 @@ async function start() {
   }
 
   const app = createApp();
-  // Empty LISTEN_HOST keeps Node's default (all interfaces) for PaaS/containers
-  // that require 0.0.0.0. Set LISTEN_HOST=127.0.0.1 behind a VPS reverse proxy.
+  // Production parseEnv defaults LISTEN_HOST to 127.0.0.1. Development may leave
+  // it empty (all interfaces). Explicit 0.0.0.0 is allowed for PaaS that need it.
   const listenHost = env.LISTEN_HOST || undefined;
   const onListening = () => {
     logger.info(`Miracle Times API listening on port ${env.PORT}`, {

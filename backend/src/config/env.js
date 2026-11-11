@@ -76,7 +76,8 @@ function parseEnv(raw = process.env) {
             .string()
             .min(32, "JWT_SECRET must be at least 32 characters in production")
         : z.string().min(16, "JWT_SECRET must be at least 16 characters"),
-      JWT_EXPIRES_IN: z.string().default("1d"),
+      // Shorter default reduces stolen-token window (see token revocation on logout).
+      JWT_EXPIRES_IN: z.string().default("12h"),
       COOKIE_NAME: z.string().default("mt_token"),
       COOKIE_DOMAIN: z.string().min(1).optional(),
       FRONTEND_URL: z.string().url(),
@@ -85,10 +86,12 @@ function parseEnv(raw = process.env) {
       MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(1_048_576),
       PUBLIC_BASE_URL: z.string().url().default("http://localhost:4000"),
       SCHEDULE_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
-      // Optional. Empty/unset preserves Node's default (all interfaces).
-      // Set to 127.0.0.1 on a VPS behind a reverse proxy.
+      // Empty in development → Node default (all interfaces) for local DX.
+      // Empty in production → forced to 127.0.0.1 (Nginx reverse-proxy safe).
+      // Set LISTEN_HOST=0.0.0.0 explicitly only when a PaaS requires it.
       LISTEN_HOST: z.string().optional().default(""),
-      // Required HTTPS Deploy Hook in production (static site rebuilds).
+      // Required HTTPS rebuild webhook in production (Contabo rebuild hook or
+      // any HTTPS endpoint that triggers `npm run build:export` + publish).
       // Leave empty in development so local publishes do not fire deploys.
       FRONTEND_DEPLOY_HOOK_URL: z.string().optional().default(""),
       FRONTEND_DEPLOY_DEBOUNCE_MS: z.coerce
@@ -270,12 +273,18 @@ function parseEnv(raw = process.env) {
     }
   }
 
+  const listenHostRaw = (data.LISTEN_HOST || "").trim();
+  // Production defaults to loopback so a missing env cannot expose Node publicly.
+  const listenHost =
+    listenHostRaw ||
+    (data.NODE_ENV === "production" ? "127.0.0.1" : "");
+
   return {
     success: true,
     data: {
       ...data,
       FRONTEND_DEPLOY_HOOK_URL: (data.FRONTEND_DEPLOY_HOOK_URL || "").trim(),
-      LISTEN_HOST: (data.LISTEN_HOST || "").trim(),
+      LISTEN_HOST: listenHost,
       corsOrigins,
       isProduction: data.NODE_ENV === "production",
       uploadPath: path.isAbsolute(data.UPLOAD_DIR)

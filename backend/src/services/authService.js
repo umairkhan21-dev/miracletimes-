@@ -1,9 +1,11 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { env } = require("../config/env");
 const { query } = require("../config/database");
 const { AppError } = require("../utils/AppError");
 const { parseJwtExpiresInMs } = require("../utils/expiresIn");
+const { isJtiRevoked, revokeJti } = require("./tokenRevocation");
 
 const PUBLIC_USER_FIELDS = "id, name, email, role, is_active, created_at, updated_at";
 
@@ -18,6 +20,7 @@ function signToken(user) {
       sub: user.id,
       role: user.role,
       email: user.email,
+      jti: crypto.randomUUID(),
     },
     env.JWT_SECRET,
     { expiresIn: expiresInSeconds },
@@ -25,10 +28,27 @@ function signToken(user) {
 }
 
 function verifyToken(token) {
+  let payload;
   try {
-    return jwt.verify(token, env.JWT_SECRET);
+    payload = jwt.verify(token, env.JWT_SECRET);
   } catch {
     throw new AppError("Invalid or expired token", 401, { code: "UNAUTHORIZED" });
+  }
+  if (payload?.jti && isJtiRevoked(payload.jti)) {
+    throw new AppError("Invalid or expired token", 401, { code: "UNAUTHORIZED" });
+  }
+  return payload;
+}
+
+function revokeToken(token) {
+  if (!token) return;
+  try {
+    const payload = jwt.verify(token, env.JWT_SECRET, { ignoreExpiration: true });
+    if (payload?.jti) {
+      revokeJti(payload.jti, payload.exp);
+    }
+  } catch {
+    // Ignore malformed tokens on logout — cookie is cleared regardless.
   }
 }
 
@@ -98,6 +118,7 @@ function cookieOptions() {
 module.exports = {
   signToken,
   verifyToken,
+  revokeToken,
   findUserById,
   login,
   toPublicUser,
