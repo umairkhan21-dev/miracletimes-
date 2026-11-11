@@ -17,7 +17,7 @@ export function SiteFooter() {
         <div className="footer-brand">
           <Link href={demoPath("/")} className="footer-lockup">
             <span className="brand-mark">
-              <Image className="brand-logo" src="/mark.png" alt="" width={183} height={101} />
+              <Image className="brand-logo" src="/mark.png" alt="" width={214} height={128} />
             </span>
             <span>
               <span className="brand-name">{site.name}</span>

@@ -19,8 +19,8 @@ export function BrandMasthead() {
               className="brand-logo"
               src="/mark.png"
               alt=""
-              width={183}
-              height={101}
+              width={214}
+              height={128}
               priority
             />
           </span>

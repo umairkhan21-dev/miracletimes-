@@ -108,7 +108,7 @@ export function AdminShell({
       <div className="admin-shell">
         <aside className="admin-sidebar">
           <div className="admin-brand">
-            <Image src="/mark.png" alt="" width={52} height={29} />
+            <Image src="/mark.png" alt="" width={52} height={31} />
             <div>
               <strong>Miracle Times</strong>
               <span>Newsroom admin</span>
