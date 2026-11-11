@@ -1,6 +1,5 @@
 import { fetchAllArticles } from "@/lib/api";
 import { categoryName } from "@/lib/categories";
-import { getDemoArticles } from "@/lib/demoContent";
 import type { Locale } from "@/lib/i18n/config";
 import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
@@ -43,13 +42,6 @@ export async function GET() {
     console.warn(
       "RSS feed could not load articles from API:",
       error instanceof Error ? error.message : error,
-    );
-  }
-
-  if (!articles.length) {
-    articles = uniqueBySlug(getDemoArticles()).sort(
-      (a, b) =>
-        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
     );
   }
 

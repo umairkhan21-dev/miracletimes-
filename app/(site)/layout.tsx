@@ -2,7 +2,6 @@ import { LanguageProvider } from "@/components/LanguageProvider";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SkipLink } from "@/components/SkipLink";
-import { langBootScript } from "@/lib/i18n/storage";
 import { sitePath } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { Metadata } from "next";
@@ -34,7 +33,6 @@ export const metadata: Metadata = {
 export default function SiteLayout({ children }: { children: ReactNode }) {
   return (
     <div lang="hi" className="site-shell" suppressHydrationWarning>
-      <script dangerouslySetInnerHTML={{ __html: langBootScript }} />
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link
         rel="preconnect"

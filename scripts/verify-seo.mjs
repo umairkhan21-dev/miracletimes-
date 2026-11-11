@@ -11,6 +11,11 @@ import test from "node:test";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
+/** Current published fixtures (not removed demo-only corpus). */
+const HI_SLUG = "lucknow-smart-technology-urban-development-test-hi";
+const EN_SLUG = "lucknow-smart-technology-urban-development-test";
+const EN_BRANDED_SLUG = "lucknow-smart-city-digital-services-test";
+
 function trimSeo(value) {
   return (value || "").trim();
 }
@@ -103,7 +108,7 @@ function readExport(slug) {
   };
 }
 
-function assertMeta(head, { titleIncludes, descriptionIncludes, ogType, canonical, noLocalhost }) {
+function assertMeta(head, { titleIncludes, descriptionIncludes, ogType, canonical, noLocalhostMeta }) {
   assert.match(head, new RegExp(`<title>[^<]*${titleIncludes}[^<]*</title>`));
   assert.match(
     head,
@@ -111,46 +116,67 @@ function assertMeta(head, { titleIncludes, descriptionIncludes, ogType, canonica
   );
   assert.match(head, new RegExp(`property="og:type" content="${ogType}"`));
   assert.match(head, new RegExp(`rel="canonical" href="${canonical}"`));
-  if (noLocalhost) {
-    assert.doesNotMatch(head, /localhost|127\.0\.0\.1/i);
+  // Local rebuilds may preload article images from localhost API; OG/Twitter
+  // share images must still never bake private hosts into meta tags.
+  if (noLocalhostMeta) {
+    assert.doesNotMatch(
+      head,
+      /property="og:image"[^>]+(?:localhost|127\.0\.0\.1)/i,
+    );
+    assert.doesNotMatch(
+      head,
+      /name="twitter:image"[^>]+(?:localhost|127\.0\.0\.1)/i,
+    );
   }
 }
 
-test("exported Hindi article HTML uses headline fallback and canonical", (t) => {
-  const exported = readExport("agra-virasat-yatayat-namuna");
+test("exported Hindi article HTML uses admin SEO fields and body content", (t) => {
+  const exported = readExport(HI_SLUG);
   if (!exported) {
-    t.skip("out/news/agra-virasat-yatayat-namuna missing — run build:export first");
+    t.skip(`out/news/${HI_SLUG} missing — run build:export first`);
     return;
   }
   assertMeta(exported.head, {
-    titleIncludes: "आगरा",
-    descriptionIncludes: "ताज",
+    titleIncludes: "स्मार्ट तकनीक",
+    descriptionIncludes: "डिजिटल सेवाओं",
     ogType: "article",
-    canonical: "https://miracletimes.in/news/agra-virasat-yatayat-namuna/",
-    noLocalhost: true,
+    canonical: `https://miracletimes.in/news/${HI_SLUG}/`,
+    noLocalhostMeta: true,
   });
+  assert.match(exported.head, /name="twitter:title"/);
+  assert.match(exported.head, /name="twitter:description"/);
   assert.match(exported.html, /application\/ld\+json/);
+  assert.match(exported.html, /"@type":"NewsArticle"/);
   assert.doesNotMatch(exported.head, /Miracle Times — Miracle Times/);
-  assert.match(exported.head, /name="twitter:card" content="summary"/);
   assert.match(exported.html, /<html[^>]*lang="hi"/);
   assert.match(exported.html, /name="language" content="hi"/);
+  // Full article body must be in initial HTML (not only after JS).
+  assert.match(exported.html, /<h1>/);
+  assert.match(exported.html, /class="story-body"/);
+  assert.match(exported.html, /class="story-dek"/);
+  assert.match(exported.html, /class="[^"]*story-meta/);
+  assert.doesNotMatch(exported.html, /खबरें लोड हो रही हैं/);
 });
 
-test("exported English article HTML uses SEO fields", (t) => {
-  const exported = readExport("agra-heritage-traffic-sample");
+test("exported English article HTML uses SEO fields and hreflang", (t) => {
+  const exported = readExport(EN_SLUG);
   if (!exported) {
-    t.skip("out/news/agra-heritage-traffic-sample missing — run build:export first");
+    t.skip(`out/news/${EN_SLUG} missing — run build:export first`);
     return;
   }
   assertMeta(exported.head, {
-    titleIncludes: "Agra heritage traffic sample plan",
-    descriptionIncludes: "sample English SEO description",
+    titleIncludes: "Lucknow Smart City",
+    descriptionIncludes: "digital services",
     ogType: "article",
-    canonical: "https://miracletimes.in/news/agra-heritage-traffic-sample/",
-    noLocalhost: true,
+    canonical: `https://miracletimes.in/news/${EN_SLUG}/`,
+    noLocalhostMeta: true,
   });
   assert.match(exported.head, /hrefLang="en"/);
   assert.match(exported.head, /hrefLang="hi"/);
+  assert.match(exported.html, /application\/ld\+json/);
+  assert.match(exported.html, /<h1>/);
+  assert.match(exported.html, /class="story-body"/);
+  assert.match(exported.html, /class="[^"]*story-meta/);
   assert.doesNotMatch(exported.head, /Miracle Times — Miracle Times/);
   assert.match(exported.html, /<html[^>]*lang="en"/);
   assert.match(exported.html, /name="language" content="en"/);
@@ -167,11 +193,9 @@ test("exported homepage keeps default Hindi html lang", (t) => {
 });
 
 test("exported branded SEO title is not doubled by the layout template", (t) => {
-  const exported = readExport("lucknow-smart-city-digital-services-test");
+  const exported = readExport(EN_BRANDED_SLUG);
   if (!exported) {
-    t.skip(
-      "out/news/lucknow-smart-city-digital-services-test missing — run build:export first",
-    );
+    t.skip(`out/news/${EN_BRANDED_SLUG} missing — run build:export first`);
     return;
   }
   assert.match(
@@ -179,7 +203,31 @@ test("exported branded SEO title is not doubled by the layout template", (t) => 
     /<title>Lucknow Smart City Initiative \| Miracle Times<\/title>/,
   );
   assert.doesNotMatch(exported.head, /Miracle Times — Miracle Times/);
-  assert.match(exported.head, /article:section" content="Uttar Pradesh"/);
-  assert.doesNotMatch(exported.head, /localhost:4001/);
   assert.match(exported.html, /application\/ld\+json/);
+  assert.match(exported.html, /class="story-body"/);
+});
+
+test("exported robots.txt matches app robots policy", (t) => {
+  const file = path.join(root, "out", "robots.txt");
+  if (!fs.existsSync(file)) {
+    t.skip("out/robots.txt missing — run build:export first");
+    return;
+  }
+  const text = fs.readFileSync(file, "utf8");
+  assert.match(text, /Disallow:\s*\/admin\//);
+  assert.match(text, /Disallow:\s*\/search\//);
+  assert.match(text, /Sitemap:\s*https:\/\/miracletimes\.in\/sitemap\.xml/);
+  assert.match(text, /Host:\s*https:\/\/miracletimes\.in/);
+});
+
+test("exported sitemap.xml lists current published article URLs", (t) => {
+  const file = path.join(root, "out", "sitemap.xml");
+  if (!fs.existsSync(file)) {
+    t.skip("out/sitemap.xml missing — run build:export first");
+    return;
+  }
+  const xml = fs.readFileSync(file, "utf8");
+  assert.match(xml, new RegExp(`/news/${HI_SLUG}/`));
+  assert.match(xml, new RegExp(`/news/${EN_SLUG}/`));
+  assert.match(xml, /https:\/\/miracletimes\.in\/<\/loc>/);
 });

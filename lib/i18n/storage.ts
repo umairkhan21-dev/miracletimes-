@@ -27,8 +27,7 @@ export function writeStoredLocale(locale: Locale) {
 }
 
 /**
- * Inline script: apply language before paint.
- * Preference order: stored UI locale → <meta name="language"> (article content)
- * → site default. Also syncs the nearest .site-shell wrapper.
+ * Language boot runs from `/lang-boot.js` (see `public/lang-boot.js`) so the
+ * Contabo/Nginx CSP can avoid trusting arbitrary inline boot code.
+ * JSON-LD still uses a small inline script with `<` escaped — documented CSP tradeoff.
  */
-export const langBootScript = `(function(){try{var k=${JSON.stringify(LANG_STORAGE_KEY)};var stored=localStorage.getItem(k);var lang;if(stored==="hi"||stored==="en"){lang=stored;}else{var meta=document.querySelector('meta[name="language"]');var m=meta&&meta.getAttribute("content");lang=(m==="en"||m==="hi")?m:${JSON.stringify(DEFAULT_LOCALE)};}var htmlLang=lang==="hi"?"hi":"en";document.documentElement.dataset.uiLang=lang;document.documentElement.lang=htmlLang;var shell=document.currentScript&&document.currentScript.parentElement;if(shell&&shell.classList&&shell.classList.contains("site-shell")){shell.lang=htmlLang;}}catch(e){document.documentElement.dataset.uiLang=${JSON.stringify(DEFAULT_LOCALE)};}})();`;

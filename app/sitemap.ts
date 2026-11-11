@@ -1,6 +1,5 @@
 import { fetchAllArticles } from "@/lib/api";
 import { categories, infoLinks } from "@/lib/categories";
-import { getDemoArticles } from "@/lib/demoContent";
 import { absoluteSiteUrl } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { Article } from "@/lib/types";
@@ -36,10 +35,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       "Sitemap could not load articles from API:",
       error instanceof Error ? error.message : error,
     );
-  }
-
-  if (!articles.length) {
-    articles = uniqueBySlug(getDemoArticles());
   }
 
   const lastArticle = articles[0]?.publishedAt;

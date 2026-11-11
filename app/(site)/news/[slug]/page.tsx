@@ -1,11 +1,13 @@
 import { ArticleDetail } from "@/components/ArticleDetail";
 import {
-  fetchArticleBySlug,
   fetchPublishedSlugs,
   resolveArticleForLocale,
 } from "@/lib/api";
+import {
+  loadArticleForMetadata,
+  loadArticlePageBundle,
+} from "@/lib/articlePage";
 import { categoryName } from "@/lib/categories";
-import { getDemoSlugs } from "@/lib/demoContent";
 import {
   articleCanonicalUrl,
   buildArticleJsonLd,
@@ -25,41 +27,16 @@ type Props = { params: Promise<{ slug: string }> };
 export const dynamicParams = true;
 
 export async function generateStaticParams() {
-  const isStaticExport = process.env.STATIC_EXPORT === "1";
-
   try {
     const slugs = await fetchPublishedSlugs();
-    if (slugs.length) {
-      return slugs.map((slug) => ({ slug }));
-    }
+    return slugs.map((slug) => ({ slug }));
   } catch (error) {
     console.warn(
       "Could not load article slugs from API during build:",
       error instanceof Error ? error.message : error,
     );
+    return [];
   }
-
-  const demoSlugs = getDemoSlugs();
-  if (demoSlugs.length) {
-    return demoSlugs.map((slug) => ({ slug }));
-  }
-
-  if (isStaticExport) {
-    throw new Error(
-      "STATIC_EXPORT build found zero article slugs (API empty and no demo corpus).",
-    );
-  }
-
-  return [];
-}
-
-async function loadArticleForMetadata(slug: string) {
-  const article =
-    (await fetchArticleBySlug(slug, "hi").catch(() => null)) ??
-    (await fetchArticleBySlug(slug, "en").catch(() => null));
-  if (!article) return null;
-  const language = article.language === "en" ? "en" : "hi";
-  return { article, language } as const;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -143,28 +120,27 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function NewsArticlePage({ params }: Props) {
   const { slug } = await params;
-  const loaded = await loadArticleForMetadata(slug).catch(() => null);
+  const bundle = await loadArticlePageBundle(slug).catch(() => null);
+  const article = bundle?.article ?? null;
+  const language = bundle?.language ?? "hi";
 
   return (
     <>
-      {loaded ? (
+      {article ? (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(
               buildArticleJsonLd({
-                article: loaded.article,
-                language: loaded.language,
-                section: categoryName(
-                  loaded.article.category,
-                  loaded.language,
-                ),
+                article,
+                language,
+                section: categoryName(article.category, language),
               }),
             ).replace(/</g, "\\u003c"),
           }}
         />
       ) : null}
-      <ArticleDetail slug={slug} />
+      <ArticleDetail slug={slug} initialBundle={bundle} />
     </>
   );
 }

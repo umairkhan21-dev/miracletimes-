@@ -5,10 +5,6 @@ import {
   fetchTrendingArticles,
 } from "@/lib/api";
 import { categories, categoryName, getCategory } from "@/lib/categories";
-import {
-  filterDemoByCategory,
-  getDemoArticles,
-} from "@/lib/demoContent";
 import type { Locale } from "@/lib/i18n/config";
 import { demoPath } from "@/lib/paths";
 import type { Article } from "@/lib/types";
@@ -278,23 +274,12 @@ export function filterArticlesByQuery(articles: Article[], query: string) {
   });
 }
 
-async function loadArticlesWithDemoFallback(
-  language: Locale,
-  category?: string,
-): Promise<Article[]> {
-  try {
-    const articles = await fetchAllArticles({ language, category });
-    if (articles.length) return articles;
-  } catch {
-    // API empty/unreachable — use frontend demo corpus for UI review.
-  }
-
-  if (category) return filterDemoByCategory(category);
-  return getDemoArticles(language);
-}
-
 export async function loadArticles(language: Locale): Promise<Article[]> {
-  return loadArticlesWithDemoFallback(language);
+  try {
+    return await fetchAllArticles({ language });
+  } catch {
+    return [];
+  }
 }
 
 export async function loadHomepageBundle(language: Locale) {
@@ -314,10 +299,6 @@ export async function loadHomepageBundle(language: Locale) {
     trending = [];
   }
 
-  if (!articles.length) {
-    articles = getDemoArticles(language);
-  }
-
   const homepage = buildHomepage(articles);
   return {
     ...homepage,
@@ -332,7 +313,11 @@ export async function loadArticlesByCategory(
   language: Locale,
   categorySlug: string,
 ) {
-  return loadArticlesWithDemoFallback(language, categorySlug);
+  try {
+    return await fetchAllArticles({ language, category: categorySlug });
+  } catch {
+    return [];
+  }
 }
 
 export async function searchArticlesRemote(language: Locale, query: string) {
@@ -345,10 +330,8 @@ export async function searchArticlesRemote(language: Locale, query: string) {
       q: trimmed,
       limit: 50,
     });
-    if (articles.length) return articles;
+    return articles;
   } catch {
-    // Fall through to local demo search.
+    return [];
   }
-
-  return filterArticlesByQuery(getDemoArticles(language), trimmed);
 }

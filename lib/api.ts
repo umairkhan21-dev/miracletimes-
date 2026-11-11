@@ -1,4 +1,3 @@
-import { findDemoArticle, getDemoSlugs } from "@/lib/demoContent";
 import type { Locale } from "@/lib/i18n/config";
 import type { Article, Category, ContentBlock } from "@/lib/types";
 
@@ -210,8 +209,6 @@ async function apiGet<T>(
 export async function fetchArticles(
   params: ArticleListParams = {},
 ): Promise<{ articles: Article[]; meta?: ApiMeta }> {
-  // Demo-only deploys (no API env) skip network and let callers use the
-  // frontend corpus via empty results / slug fallbacks.
   if (!isApiConfigured()) {
     return {
       articles: [],
@@ -259,22 +256,14 @@ export async function fetchArticleBySlug(
   language: Locale = "hi",
 ): Promise<Article> {
   if (!isApiConfigured()) {
-    const demo = findDemoArticle(slug);
-    if (demo) return demo;
     throw new ApiError("Article not found", 404, "NOT_FOUND");
   }
 
-  try {
-    const { data } = await apiGet<ApiArticle>(
-      `/articles/${encodeURIComponent(slug)}`,
-      { language },
-    );
-    return normalizeArticle(data);
-  } catch (error) {
-    const demo = findDemoArticle(slug);
-    if (demo) return demo;
-    throw error;
-  }
+  const { data } = await apiGet<ApiArticle>(
+    `/articles/${encodeURIComponent(slug)}`,
+    { language },
+  );
+  return normalizeArticle(data);
 }
 
 /**
@@ -291,9 +280,6 @@ export async function resolveArticleForLocale(
     bridge = await fetchArticleBySlug(slug, language);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 404) {
-      // Network / unexpected errors: still try frontend demo corpus.
-      const demo = findDemoArticle(slug);
-      if (demo) return { article: demo, canonicalSlug: demo.slug };
       throw error;
     }
   }
@@ -302,37 +288,21 @@ export async function resolveArticleForLocale(
     return { article: bridge, canonicalSlug: bridge.slug };
   }
 
-  // Demo corpus has no language siblings — treat as canonical for any UI locale.
-  if (bridge && findDemoArticle(bridge.slug)?.id === bridge.id) {
-    return { article: bridge, canonicalSlug: bridge.slug };
-  }
-
   // Slug may belong to the other language (API resolves by slug).
   // Find the sibling translation for the requested UI language.
   const publicId = bridge?.id;
-  if (!publicId) {
-    const demo = findDemoArticle(slug);
-    return demo ? { article: demo, canonicalSlug: demo.slug } : null;
-  }
+  if (!publicId) return null;
 
-  try {
-    const { articles } = await fetchArticles({
-      language,
-      limit: 100,
-    });
-    const match = articles.find((item) => item.id === publicId);
-    if (!match) {
-      const demo = findDemoArticle(slug);
-      return demo ? { article: demo, canonicalSlug: demo.slug } : null;
-    }
+  const { articles } = await fetchArticles({
+    language,
+    limit: 100,
+  });
+  const match = articles.find((item) => item.id === publicId);
+  if (!match) return null;
 
-    // List payloads omit content blocks — load the canonical translation.
-    const article = await fetchArticleBySlug(match.slug, language);
-    return { article, canonicalSlug: article.slug };
-  } catch {
-    const demo = findDemoArticle(slug);
-    return demo ? { article: demo, canonicalSlug: demo.slug } : null;
-  }
+  // List payloads omit content blocks — load the canonical translation.
+  const article = await fetchArticleBySlug(match.slug, language);
+  return { article, canonicalSlug: article.slug };
 }
 
 export async function fetchFeaturedArticles(
@@ -395,27 +365,17 @@ export async function fetchCategoryBySlug(
 
 /** Collect published slugs for both languages (static export paths). */
 export async function fetchPublishedSlugs(): Promise<string[]> {
-  if (!isApiConfigured()) return getDemoSlugs();
+  if (!isApiConfigured()) return [];
 
-  try {
-    const [hiArticles, enArticles] = await Promise.all([
-      fetchAllArticles({ language: "hi" }),
-      fetchAllArticles({ language: "en" }),
-    ]);
-    const slugs = Array.from(
-      new Set(
-        [...hiArticles, ...enArticles]
-          .map((article) => article.slug)
-          .filter(Boolean),
-      ),
-    );
-    if (slugs.length) return slugs;
-  } catch (error) {
-    console.warn(
-      "Could not load published slugs from API; using frontend demo corpus:",
-      error instanceof Error ? error.message : error,
-    );
-  }
-
-  return getDemoSlugs();
+  const [hiArticles, enArticles] = await Promise.all([
+    fetchAllArticles({ language: "hi" }),
+    fetchAllArticles({ language: "en" }),
+  ]);
+  return Array.from(
+    new Set(
+      [...hiArticles, ...enArticles]
+        .map((article) => article.slug)
+        .filter(Boolean),
+    ),
+  );
 }

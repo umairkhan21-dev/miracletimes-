@@ -11,6 +11,7 @@ import { NewsImage } from "@/components/NewsImage";
 import { ShareButtons } from "@/components/ShareButtons";
 import { useI18n } from "@/components/LanguageProvider";
 import { ApiError, resolveArticleForLocale } from "@/lib/api";
+import type { ArticlePageBundle } from "@/lib/articlePage";
 import { categoryName } from "@/lib/categories";
 import {
   loadArticles,
@@ -20,6 +21,7 @@ import {
   selectRelated,
 } from "@/lib/content";
 import { formatDateTime } from "@/lib/format";
+import type { Locale } from "@/lib/i18n/config";
 import { demoAbsoluteUrl, demoPath } from "@/lib/paths";
 import { site } from "@/lib/site";
 import type { Article } from "@/lib/types";
@@ -40,13 +42,48 @@ type DetailState =
       older?: Article;
     };
 
-export function ArticleDetail({ slug }: { slug: string }) {
+type Props = {
+  slug: string;
+  /** Server-loaded bundle for the slug's language (static export / SSR). */
+  initialBundle?: ArticlePageBundle | null;
+};
+
+function bundleToReady(bundle: ArticlePageBundle): DetailState {
+  return {
+    status: "ready",
+    article: bundle.article,
+    related: bundle.related,
+    latest: bundle.latest,
+    newer: bundle.newer,
+    older: bundle.older,
+  };
+}
+
+export function ArticleDetail({ slug, initialBundle = null }: Props) {
   const { locale, t } = useI18n();
   const router = useRouter();
-  const [state, setState] = useState<DetailState>({ status: "loading" });
+  const initialLocale: Locale | null = initialBundle?.language ?? null;
+
+  const [state, setState] = useState<DetailState>(() => {
+    if (initialBundle?.article) return bundleToReady(initialBundle);
+    return { status: "loading" };
+  });
 
   useEffect(() => {
     let cancelled = false;
+
+    // First paint already has the exported language's full article HTML.
+    // Only refetch when the UI language changes away from that bundle.
+    if (
+      initialBundle?.article &&
+      initialLocale &&
+      locale === initialLocale &&
+      initialBundle.article.slug === slug
+    ) {
+      setState(bundleToReady(initialBundle));
+      return;
+    }
+
     setState({ status: "loading" });
 
     (async () => {
@@ -94,7 +131,7 @@ export function ArticleDetail({ slug }: { slug: string }) {
     return () => {
       cancelled = true;
     };
-  }, [slug, locale, router]);
+  }, [slug, locale, router, initialBundle, initialLocale]);
 
   if (state.status === "loading") {
     return <ContentLoading message={t("content.loading")} />;

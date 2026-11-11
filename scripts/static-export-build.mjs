@@ -52,12 +52,12 @@ loadEnvFile(path.join(root, ".env.local"));
 
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || "").trim();
 if (!apiUrl) {
-  // Temporary: allow frontend-only demo deploys (Vercel UI review) without an API.
-  // Public pages fall back to `lib/demoContent.ts` when the API is missing/empty.
-  console.warn(
-    "[static-export] NEXT_PUBLIC_API_URL is unset — exporting with frontend demo articles. Set the production API URL once real news is published from admin.",
+  console.error(
+    "[static-export] NEXT_PUBLIC_API_URL is required. Set it to the production API so published admin articles are exported.",
   );
-} else if (/localhost|127\.0\.0\.1/i.test(apiUrl)) {
+  process.exit(1);
+}
+if (/localhost|127\.0\.0\.1/i.test(apiUrl)) {
   console.warn(
     `[static-export] NEXT_PUBLIC_API_URL is ${apiUrl}. Open Graph images resolved from this host will be omitted from HTML; use the production API URL for deploy builds.`,
   );

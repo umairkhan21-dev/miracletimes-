@@ -1,5 +1,6 @@
 import { site } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
@@ -22,10 +23,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    // suppressHydrationWarning: langBootScript may set lang/data-ui-lang from
+    // suppressHydrationWarning: /lang-boot.js may set lang/data-ui-lang from
     // localStorage before React hydrates (server always defaults to hi).
     <html lang="hi" suppressHydrationWarning>
-      <body style={{ margin: 0 }}>{children}</body>
+      <body style={{ margin: 0 }}>
+        <Script src="/lang-boot.js" strategy="beforeInteractive" />
+        {children}
+      </body>
     </html>
   );
 }
