@@ -104,7 +104,7 @@ async function flush() {
 }
 
 /**
- * Queue a debounced production frontend rebuild (Vercel Deploy Hook).
+ * Queue a debounced production frontend rebuild (Contabo rebuild webhook).
  * Safe no-op when FRONTEND_DEPLOY_HOOK_URL is unset.
  */
 function requestFrontendRebuild(reason = "article.change", options = {}) {

@@ -1,0 +1,21 @@
+[Unit]
+Description=Miracle Times static rebuild webhook
+After=network.target
+
+[Service]
+Type=simple
+User=miracletimes
+Group=miracletimes
+WorkingDirectory=/opt/miracletimes
+EnvironmentFile=/etc/miracle-times/rebuild.env
+ExecStart=/usr/bin/node deploy/contabo/rebuild-webhook.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/miracletimes /var/www/miracletimes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,23 @@
+[Unit]
+Description=Miracle Times API
+After=network.target mysql.service
+Wants=mysql.service
+
+[Service]
+Type=simple
+User=miracletimes
+Group=miracletimes
+WorkingDirectory=/opt/miracletimes/backend
+EnvironmentFile=/etc/miracle-times/api.env
+ExecStart=/usr/bin/node src/server.js
+Restart=on-failure
+RestartSec=5
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/lib/miracletimes/uploads
+
+[Install]
+WantedBy=multi-user.target

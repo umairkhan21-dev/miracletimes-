@@ -4,15 +4,19 @@ Code hardening alone does not make the site production-ready. Confirm these
 controls on the live host after deploy. **Do not claim production readiness
 without evidence from a real deployment.**
 
-Recommended architecture (same registrable domain, separate hosts):
+Recommended architecture (Contabo VPS, same registrable domain):
 
 | Role | Origin |
 |---|---|
-| Public website + admin UI (Vercel) | `https://miracletimes.in` (and optionally `https://www.miracletimes.in`) |
-| Express API + uploads (VPS) | `https://api.miracletimes.in` |
+| Public website + admin UI (Nginx static `out/`) | `https://miracletimes.in` (and optionally `https://www.miracletimes.in`) |
+| Express API + uploads (Nginx → `127.0.0.1`) | `https://api.miracletimes.in` |
+| Rebuild webhook (Nginx → `127.0.0.1:4010`) | `https://miracletimes.in/hooks/rebuild` |
 
+See [CONTABO_DEPLOYMENT.md](./CONTABO_DEPLOYMENT.md) and `deploy/contabo/`.
 This keeps browser cookie auth **same-site** (shared eTLD+1 `miracletimes.in`)
-while allowing TLS termination and process isolation on the API host.
+while allowing TLS termination and process isolation for the API.
+
+Do **not** alter Miracle Drugs Nginx sites or databases on the same VPS.
 
 ---
 
@@ -40,14 +44,16 @@ Set these on the API host. Never commit real values. Names only:
 | `UPLOAD_DIR` | Persistent upload path on the VPS |
 | `MAX_UPLOAD_BYTES` | Upload size cap |
 | `SCHEDULE_INTERVAL_MS` | Scheduled publish poll interval |
-| `FRONTEND_DEPLOY_HOOK_URL` | **Required** Vercel Deploy Hook HTTPS URL (server-side only). Production startup fails if missing |
+| `FRONTEND_DEPLOY_HOOK_URL` | **Required** HTTPS rebuild webhook URL (Contabo `/hooks/rebuild?token=…`, server-side only). Production startup fails if missing |
 | `FRONTEND_DEPLOY_DEBOUNCE_MS` | Optional debounce (default `45000`) |
+| `LISTEN_HOST` | Production defaults to `127.0.0.1` when unset. Set `0.0.0.0` only if a PaaS requires it |
 
-Frontend (Vercel project env):
+Frontend / rebuild host env:
 
 | Variable | Requirement |
 |---|---|
-| `NEXT_PUBLIC_API_URL` | HTTPS API origin used by the static site (no secrets), e.g. `https://api.miracletimes.in` |
+| `NEXT_PUBLIC_API_URL` | HTTPS API origin used by the static export (no secrets), e.g. `https://api.miracletimes.in` |
+| `REBUILD_HOOK_TOKEN` | Long random token for `deploy/contabo/rebuild-webhook.mjs` |
 
 ### Generating secrets (do this on a trusted machine)
 
@@ -80,10 +86,11 @@ hook, empty `DB_PASSWORD`, and the example secret from `backend/.env.example`.
   therefore sends the API host cookie when `SameSite=Strict` or `Lax`.
 - Host-only cookies set by `api.miracletimes.in` are sufficient for API calls
   to that host. `COOKIE_DOMAIN=.miracletimes.in` is optional, not required.
-- **Do not** put the production admin UI on `*.vercel.app` while the API lives
-  on `api.miracletimes.in`. That is **cross-site**. `SameSite=Strict` cookies
-  will not be sent on cross-site XHR/fetch, and third-party cookie restrictions
-  will break login. Prefer the custom domain (or a same-site reverse proxy).
+- Serve admin UI from `https://miracletimes.in/admin` on the same site as the
+  public pages so cookies remain same-site with `api.miracletimes.in`.
+- **Do not** put the production admin UI on an unrelated registrable domain
+  while the API lives on `api.miracletimes.in`. That is **cross-site**.
+  `SameSite=Strict` cookies will not be sent on cross-site XHR/fetch.
 - Never set `SameSite=None` only to paper over unrelated registrable domains
   unless there is a documented, reviewed exception.
 
@@ -121,21 +128,20 @@ still use `Authorization: Bearer` (CSRF Origin checks are skipped for Bearer).
 ## Frontend security headers (static export)
 
 Production builds use Next.js `output: "export"`. Headers in `next.config.ts`
-are **not** guaranteed for static files. Apply headers at the edge:
+are **not** applied to static files. Apply headers on Contabo Nginx:
 
-- **Vercel:** `vercel.json` in this repo (verify response headers after deploy)
-- **Cloudflare / CDN:** mirror the same CSP, HSTS, `X-Frame-Options`,
-  `X-Content-Type-Options`, `Referrer-Policy`
-- **nginx / Caddy:** add matching header directives if you ever serve `out/` yourself
+- **Contabo Nginx:** `deploy/contabo/nginx-miracletimes.in.conf`
+- **Optional Vercel / CDN:** `vercel.json` mirrors the same policy if used later
 
-CSP (see `vercel.json`):
+CSP:
 
 - `connect-src` allows `'self'` and `https://api.miracletimes.in` only
 - `img-src` allows `'self'`, `data:`, `blob:`, and `https://api.miracletimes.in`
   (uploaded media). Local `/images/*` assets are covered by `'self'`
-- `'unsafe-inline'` remains for the language boot script and JSON-LD
+- Language boot uses external `/lang-boot.js`
+- `'unsafe-inline'` remains for JSON-LD only (documented tradeoff)
 - No `unsafe-eval`
-- If the API origin changes, update `vercel.json` before redeploying the frontend
+- If the API origin changes, update the Nginx CSP (and `vercel.json` if used)
 
 **Do not claim headers are active until you inspect live HTTP responses**, e.g.:
 
@@ -148,7 +154,8 @@ curl -sI https://api.miracletimes.in/api/health
 
 ## Automatic static deployment
 
-See [STATIC_DEPLOYMENT.md](./STATIC_DEPLOYMENT.md). Summary:
+See [STATIC_DEPLOYMENT.md](./STATIC_DEPLOYMENT.md) and
+[CONTABO_DEPLOYMENT.md](./CONTABO_DEPLOYMENT.md). Summary:
 
 1. Public article publish/update/archive/delete (and scheduled publish) queues a
    debounced POST to `FRONTEND_DEPLOY_HOOK_URL`
@@ -156,11 +163,11 @@ See [STATIC_DEPLOYMENT.md](./STATIC_DEPLOYMENT.md). Summary:
 3. Authors cannot edit published/scheduled articles, so they cannot trigger
    rebuilds via unauthorized content changes
 4. Hook URLs are redacted in logs; failures are logged as errors (not success)
-5. Deploy hooks are configured on the **API host only** — never in
+5. Rebuild hooks are configured on the **API host only** — never in
    `NEXT_PUBLIC_*` or the browser
 
-Create the hook: **Vercel → Project → Settings → Git → Deploy Hooks**
-(production branch). Set `FRONTEND_DEPLOY_HOOK_URL` on the API host.
+On Contabo, run `deploy/contabo/rebuild-webhook.mjs` and set
+`FRONTEND_DEPLOY_HOOK_URL` to the HTTPS `/hooks/rebuild?token=…` URL.
 
 ---
 
@@ -319,10 +326,11 @@ curl -sD - -o /tmp/mt-login.json -X POST https://api.miracletimes.in/api/auth/lo
 2. Article image loads from `https://api.miracletimes.in/uploads/...`
 3. Admin login on `https://miracletimes.in/admin` succeeds (cookie session)
 4. Author can edit own draft; author receives 403 updating own published article
-5. Editor publishes a draft → within debounce window, Vercel deploy starts
-6. After deploy, new slug is live; archived/deleted slug is gone on next success
-7. CSP/HSTS headers present on the apex domain response
+5. Editor publishes a draft → within debounce window, Contabo rebuild webhook runs
+6. After rebuild sync, new slug is live; archived/deleted slug is gone on next success
+7. CSP/HSTS headers present on the apex domain response (Nginx)
 8. Backup restore drill documented as completed
+9. Miracle Drugs sites still serve correctly on the same VPS
 
 ---
 
