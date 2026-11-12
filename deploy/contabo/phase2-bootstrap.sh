@@ -158,44 +158,102 @@ log "=== Directories ==="
 install -d -o miracletimes -g miracletimes -m 0755 "$UPLOAD_DIR" "$BACKUP_DIR" "$LOG_DIR"
 install -d -o root -g miracletimes -m 0750 "$ENV_DIR"
 install -d -o root -g root -m 0750 "$NGINX_BACKUP_DIR"
-install -d -o deploy -g deploy -m 0755 "$APP_ROOT"
+# IMPORTANT: never `install -d -o deploy "$APP_ROOT"` on an existing checkout.
+# That only retargets the top directory ownership and leaves `.git` (and the rest
+# of the tree) on another UID — the mixed-ownership / dubious-ownership failure.
+
+assert_tree_owner() {
+  local expect_user="$1"
+  local expect_group="${2:-$1}"
+  local dir_u dir_g git_u git_g
+  [[ -d "$APP_ROOT" ]] || die "missing $APP_ROOT"
+  dir_u="$(stat -c '%U' "$APP_ROOT")"
+  dir_g="$(stat -c '%G' "$APP_ROOT")"
+  [[ "$dir_u" == "$expect_user" && "$dir_g" == "$expect_group" ]] \
+    || die "ownership mismatch on $APP_ROOT (got ${dir_u}:${dir_g}, want ${expect_user}:${expect_group})"
+  if [[ -d "$APP_ROOT/.git" ]]; then
+    git_u="$(stat -c '%U' "$APP_ROOT/.git")"
+    git_g="$(stat -c '%G' "$APP_ROOT/.git")"
+    [[ "$git_u" == "$expect_user" && "$git_g" == "$expect_group" ]] \
+      || die "ownership mismatch on $APP_ROOT/.git (got ${git_u}:${git_g}, want ${expect_user}:${expect_group})"
+  fi
+  # Fail fast if any path under the tree drifted (mixed ownership).
+  local bad
+  bad="$(find "$APP_ROOT" \( ! -user "$expect_user" -o ! -group "$expect_group" \) -print -quit 2>/dev/null || true)"
+  [[ -z "$bad" ]] || die "mixed ownership under $APP_ROOT (example: $bad); refuse to continue"
+}
+
+chown_tree() {
+  local user="$1"
+  local group="${2:-$1}"
+  chown -R "${user}:${group}" "$APP_ROOT"
+  assert_tree_owner "$user" "$group"
+}
+
+# Git must run as the directory owner. Running `git` as root against a
+# miracletimes-owned tree triggers "dubious ownership". Do not set
+# safe.directory=* globally.
+git_ssh_as_deploy() {
+  assert_tree_owner deploy deploy
+  sudo -u deploy -H env \
+    GIT_SSH_COMMAND="ssh -i /home/deploy/.ssh/miracletimes_github_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+    git -C "$APP_ROOT" "$@"
+}
 
 log "=== Clone or update repository ==="
+# Never delete or reclone over /opt/miracletimes. Resume keeps the existing checkout.
 if [[ ! -d "$APP_ROOT/.git" ]]; then
-  # Empty dir owned by deploy for initial clone.
-  # If non-empty without .git, abort rather than clobber.
-  if [[ -n "$(ls -A "$APP_ROOT" 2>/dev/null || true)" ]]; then
-    die "$APP_ROOT is non-empty without .git — inspect before continuing"
+  if [[ ! -d "$APP_ROOT" ]]; then
+    install -d -o deploy -g deploy -m 0755 "$APP_ROOT"
+  elif [[ -n "$(ls -A "$APP_ROOT" 2>/dev/null || true)" ]]; then
+    die "$APP_ROOT is non-empty without .git — inspect before continuing (will not delete/reclone)"
+  else
+    # Empty dir: ensure deploy can write the fresh clone (full tree, not top-only).
+    chown deploy:deploy "$APP_ROOT"
   fi
-  sudo -u deploy -H env GIT_SSH_COMMAND="ssh -i /home/deploy/.ssh/miracletimes_github_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
+  assert_tree_owner deploy deploy
+  sudo -u deploy -H env \
+    GIT_SSH_COMMAND="ssh -i /home/deploy/.ssh/miracletimes_github_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
     git clone --branch "$BRANCH" --depth 1 "$REPO_SSH" "$APP_ROOT"
+  assert_tree_owner deploy deploy
+  MAIN_SHA="$(sudo -u deploy -H git -C "$APP_ROOT" rev-parse HEAD)"
 else
-  chown -R deploy:deploy "$APP_ROOT"
-  sudo -u deploy -H env GIT_SSH_COMMAND="ssh -i /home/deploy/.ssh/miracletimes_github_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" \
-    git -C "$APP_ROOT" fetch --depth 1 origin "$BRANCH"
-  sudo -u deploy -H git -C "$APP_ROOT" checkout -B "$BRANCH" "origin/$BRANCH"
+  # Existing checkout: normalize any prior mixed ownership, then update in place.
+  log "Existing git checkout found — will not delete or reclone"
+  chown_tree miracletimes miracletimes
+  PREV_SHA="$(sudo -u miracletimes -H git -C "$APP_ROOT" rev-parse HEAD)"
+  log "Existing checkout HEAD=$PREV_SHA (fetch/update only)"
+
+  # deploy holds the GitHub deploy key; briefly make the *entire* tree deploy-owned
+  # for fetch/checkout (dir + .git together), then restore miracletimes.
+  chown_tree deploy deploy
+  git_ssh_as_deploy fetch --depth 1 origin "$BRANCH"
+  git_ssh_as_deploy checkout -B "$BRANCH" "origin/$BRANCH"
+  MAIN_SHA="$(sudo -u deploy -H git -C "$APP_ROOT" rev-parse HEAD)"
+  log "Updated $PREV_SHA -> $MAIN_SHA"
 fi
-chown -R miracletimes:miracletimes "$APP_ROOT"
-MAIN_SHA="$(git -C "$APP_ROOT" rev-parse HEAD)"
-log "Checked out $BRANCH @ $MAIN_SHA"
+
+chown_tree miracletimes miracletimes
+MAIN_SHA="$(sudo -u miracletimes -H git -C "$APP_ROOT" rev-parse HEAD)"
+log "Checked out $BRANCH @ $MAIN_SHA (owner miracletimes; dir+.git consistent)"
 
 log "=== Overlay Contabo Phase-2 files (4001, shared nginx, API_INTERNAL_URL support) ==="
 install -d -o miracletimes -g miracletimes -m 0755 "$APP_ROOT/deploy/contabo"
-install -m 0644 "$STAGING/miracle_times_schema.sql" "$APP_ROOT/deploy/contabo/miracle_times_schema.sql"
-install -m 0644 "$STAGING/nginx-miracle-times-shared.conf" "$APP_ROOT/deploy/contabo/nginx-miracle-times-shared.conf"
-install -m 0644 "$STAGING/nginx-api.miracletimes.in.conf" "$APP_ROOT/deploy/contabo/nginx-api.miracletimes.in.conf"
-install -m 0644 "$STAGING/nginx-miracletimes.in.conf" "$APP_ROOT/deploy/contabo/nginx-miracletimes.in.conf"
-install -m 0644 "$STAGING/nginx-api.miracletimes.in.http-private.conf" "$APP_ROOT/deploy/contabo/nginx-api.miracletimes.in.http-private.conf"
-install -m 0644 "$STAGING/nginx-miracletimes.in.http-private.conf" "$APP_ROOT/deploy/contabo/nginx-miracletimes.in.http-private.conf"
-install -m 0644 "$STAGING/miracle-times-api.service" "$APP_ROOT/deploy/contabo/miracle-times-api.service"
-install -m 0644 "$STAGING/miracle-times-web.service" "$APP_ROOT/deploy/contabo/miracle-times-web.service"
-install -m 0644 "$STAGING/phase2-bootstrap.sh" "$APP_ROOT/deploy/contabo/phase2-bootstrap.sh"
-install -m 0644 "$STAGING/phase2-rollback.sh" "$APP_ROOT/deploy/contabo/phase2-rollback.sh"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/miracle_times_schema.sql" "$APP_ROOT/deploy/contabo/miracle_times_schema.sql"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/nginx-miracle-times-shared.conf" "$APP_ROOT/deploy/contabo/nginx-miracle-times-shared.conf"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/nginx-api.miracletimes.in.conf" "$APP_ROOT/deploy/contabo/nginx-api.miracletimes.in.conf"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/nginx-miracletimes.in.conf" "$APP_ROOT/deploy/contabo/nginx-miracletimes.in.conf"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/nginx-api.miracletimes.in.http-private.conf" "$APP_ROOT/deploy/contabo/nginx-api.miracletimes.in.http-private.conf"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/nginx-miracletimes.in.http-private.conf" "$APP_ROOT/deploy/contabo/nginx-miracletimes.in.http-private.conf"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/miracle-times-api.service" "$APP_ROOT/deploy/contabo/miracle-times-api.service"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/miracle-times-web.service" "$APP_ROOT/deploy/contabo/miracle-times-web.service"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/phase2-bootstrap.sh" "$APP_ROOT/deploy/contabo/phase2-bootstrap.sh"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/phase2-rollback.sh" "$APP_ROOT/deploy/contabo/phase2-rollback.sh"
 # App overlays required for private Contabo SSR without baking loopback into the browser bundle.
-install -m 0644 "$STAGING/lib-api.ts" "$APP_ROOT/lib/api.ts"
-install -m 0644 "$STAGING/next.config.ts" "$APP_ROOT/next.config.ts"
-install -m 0644 "$STAGING/create-admin.js" "$APP_ROOT/backend/scripts/create-admin.js"
-chown -R miracletimes:miracletimes "$APP_ROOT"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/lib-api.ts" "$APP_ROOT/lib/api.ts"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/next.config.ts" "$APP_ROOT/next.config.ts"
+install -m 0644 -o miracletimes -g miracletimes "$STAGING/create-admin.js" "$APP_ROOT/backend/scripts/create-admin.js"
+assert_tree_owner miracletimes miracletimes
 
 log "=== MySQL database + env (resumable; no secret regeneration if api.env exists) ==="
 if [[ -f "$ENV_DIR/api.env" ]]; then

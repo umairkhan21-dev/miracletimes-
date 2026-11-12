@@ -82,6 +82,20 @@ backend/uploads/**
 /uploads/**
 !/uploads/.gitkeep
 
+# TLS private keys and certificates (never commit real material).
+# Nginx templates under deploy/ may reference *.pem/*.key paths as text only.
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+*.origin.key
+*.origin.pem
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
