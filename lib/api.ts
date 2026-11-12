@@ -7,6 +7,30 @@ import type { Article, Category, ContentBlock } from "@/lib/types";
 
 const DEFAULT_API_URL = "http://localhost:4001";
 
+/**
+ * Browser-facing API origin (baked into the client bundle via NEXT_PUBLIC_*).
+ * Never set this to 127.0.0.1 in a production build — browsers cannot reach the
+ * server loopback, and Contabo private tests should use Host-header / DNS cutover.
+ */
+export function getPublicApiBaseUrl(): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
+  return (configured || DEFAULT_API_URL).replace(/\/$/, "");
+}
+
+/**
+ * Origin used for HTTP fetches.
+ * - Browser: always the public NEXT_PUBLIC_API_URL
+ * - Server (SSR / Route Handlers): API_INTERNAL_URL when set (e.g. http://127.0.0.1:4001
+ *   on Contabo before public DNS), otherwise the public URL
+ */
+export function getApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    const internal = process.env.API_INTERNAL_URL?.trim();
+    if (internal) return internal.replace(/\/$/, "");
+  }
+  return getPublicApiBaseUrl();
+}
+
 export type ApiMeta = {
   total: number;
   page: number;
@@ -71,24 +95,23 @@ export class ApiError extends Error {
   }
 }
 
-export function getApiBaseUrl(): string {
-  const configured = process.env.NEXT_PUBLIC_API_URL?.trim();
-  return (configured || DEFAULT_API_URL).replace(/\/$/, "");
-}
-
 /** True when a real API origin is configured (not the local default). */
 export function isApiConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_API_URL?.trim());
+  if (process.env.NEXT_PUBLIC_API_URL?.trim()) return true;
+  if (typeof window === "undefined" && process.env.API_INTERNAL_URL?.trim()) {
+    return true;
+  }
+  return false;
 }
 
-/** Turn relative upload paths into absolute URLs against the API host. */
+/** Turn relative upload paths into absolute URLs against the public API host. */
 export function resolveMediaUrl(url: string | null | undefined): string {
   if (!url) return "";
   if (/^https?:\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) {
     return url;
   }
   if (url.startsWith("/")) {
-    return `${getApiBaseUrl()}${url}`;
+    return `${getPublicApiBaseUrl()}${url}`;
   }
   return url;
 }

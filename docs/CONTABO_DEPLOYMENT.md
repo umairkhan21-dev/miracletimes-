@@ -12,17 +12,20 @@ window.** Templates live under `deploy/contabo/` in this repo.
 | Role | Host / path |
 |---|---|
 | Public site (Next.js SSR/ISR) | `https://miracletimes.in` → Nginx → `127.0.0.1:3000` |
-| API + uploads (local media fallback) | `https://api.miracletimes.in` → Nginx → `127.0.0.1:4000` |
+| API + uploads (local media fallback) | `https://api.miracletimes.in` → Nginx → `127.0.0.1:4001` |
 | MySQL | Localhost only (not public) |
 | Object storage (optional) | S3-compatible (R2 / Contabo Object Storage) via env |
-| Miracle Drugs | **Unchanged** separate Nginx server blocks / paths |
+| Miracle Drugs | **Unchanged** separate Nginx server blocks / paths (API on `127.0.0.1:4000`) |
 
 ```
 Internet
    │
    ├─ miracletimes.in ──Nginx──► 127.0.0.1:3000 (next start)
-   └─ api.miracletimes.in ──Nginx──► 127.0.0.1:4000 (Express API)
+   └─ api.miracletimes.in ──Nginx──► 127.0.0.1:4001 (Express API)
 ```
+
+**Port note:** Miracle Drugs already binds `127.0.0.1:4000`. Miracle Times API
+must use `PORT=4001` / `PUBLIC_BASE_URL` accordingly.
 
 Static `out/` + `/hooks/rebuild` are **retired**. Publishing no longer runs
 `npm run build:export`.
@@ -106,10 +109,11 @@ REVALIDATE_TOKEN=local-dev-revalidate-token-32chars-min npm run test:ssr-smoke
    - `deploy/contabo/miracle-times-web.service`
    - Do **not** install `miracle-times-rebuild.service` (obsolete)
 8. Install Nginx site files from `deploy/contabo/nginx-*.conf` **as new site files** —
-   do not overwrite Miracle Drugs configs. Declare `limit_req_zone` once in `http {}`.
+   do not overwrite Miracle Drugs configs. Install `nginx-miracle-times-shared.conf` under
+   `/etc/nginx/conf.d/` (zones + upstreams); do not edit `/etc/nginx/nginx.conf`.
 9. Issue TLS certs for `miracletimes.in` and `api.miracletimes.in`.
 10. Seed admin: `cd /opt/miracletimes/backend && npm run seed:admin -- …`
-11. Enable firewall: `80/443` public; SSH restricted; **deny** Node ports `3000`/`4000` and MySQL `3306` publicly.
+11. Enable firewall: `80/443` public; SSH restricted; **deny** Node ports `3000`/`4001` (and Drugs `4000`) and MySQL `3306` publicly.
 12. Schedule `deploy/contabo/backup.sh` via cron; copy backups off-box; restore-drill on staging.
 13. Optional later: set `STORAGE_PROVIDER=s3` + R2/Contabo Object Storage env — **do not migrate/delete existing local media**.
 
@@ -118,7 +122,10 @@ REVALIDATE_TOKEN=local-dev-revalidate-token-32chars-min npm run test:ssr-smoke
 ```bash
 NODE_ENV=production
 PORT=3000
+# Browser-facing API origin (baked into client). Never use 127.0.0.1 here.
 NEXT_PUBLIC_API_URL=https://api.miracletimes.in
+# Server-only SSR/fetch origin on the same VPS (not exposed to browsers).
+API_INTERNAL_URL=http://127.0.0.1:4001
 REVALIDATE_TOKEN=generate-with-openssl-rand-hex-32
 # Optional CDN/image hosts for next/image remotePatterns:
 # NEXT_IMAGE_REMOTE_HOSTS=cdn.miracletimes.in,pub-xxxx.r2.dev
@@ -140,7 +147,7 @@ REVALIDATE_TOKEN=generate-with-openssl-rand-hex-32
 curl -sI https://miracletimes.in/ | grep -iE 'content-security-policy|strict-transport|x-frame'
 curl -sI https://api.miracletimes.in/api/health
 curl -s https://miracletimes.in/robots.txt | grep -E 'Disallow|Sitemap'
-ss -lntp | grep -E '3000|4000'   # should show 127.0.0.1 only
+ss -lntp | grep -E '3000|4001|4000'   # Times 3000/4001 + Drugs 4000; all 127.0.0.1 only
 ```
 
 After publishing a test article with a unique SEO title, confirm that string appears in

@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+// CSP / next/image must use the browser-facing API origin only — never the
+// server-only API_INTERNAL_URL (e.g. http://127.0.0.1:4001 on Contabo).
 const apiOrigin =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
   "http://localhost:4001";
@@ -9,6 +11,19 @@ try {
   apiHost = new URL(apiOrigin).hostname;
 } catch {
   apiHost = "localhost";
+}
+
+// When API_INTERNAL_URL is set (Contabo private SSR), the browser-facing
+// origin must not be loopback — that was the Vercel localhost misconfig.
+if (
+  process.env.API_INTERNAL_URL?.trim() &&
+  (apiHost === "127.0.0.1" || apiHost === "localhost")
+) {
+  throw new Error(
+    "NEXT_PUBLIC_API_URL must not be localhost/127.0.0.1 when API_INTERNAL_URL is set. " +
+      "Use the public API origin (e.g. https://api.miracletimes.in) for the browser bundle " +
+      "and keep API_INTERNAL_URL=http://127.0.0.1:4001 for server-side fetches only.",
+  );
 }
 
 const mediaHosts = [

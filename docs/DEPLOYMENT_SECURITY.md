@@ -9,7 +9,7 @@ Recommended architecture (Contabo VPS, same registrable domain):
 | Role | Origin |
 |---|---|
 | Public website + admin UI (Nginx → Next.js SSR/ISR `127.0.0.1:3000`) | `https://miracletimes.in` (and optionally `https://www.miracletimes.in`) |
-| Express API + uploads (Nginx → `127.0.0.1:4000`) | `https://api.miracletimes.in` |
+| Express API + uploads (Nginx → `127.0.0.1:4001`) | `https://api.miracletimes.in` |
 | Cache revalidation | API → loopback `POST http://127.0.0.1:3000/api/revalidate/` |
 
 Authoritative Contabo cutover steps: [CONTABO_DEPLOYMENT.md](./CONTABO_DEPLOYMENT.md)
@@ -201,12 +201,12 @@ default all-interfaces bind. Terminate TLS on the proxy:
 
 **Caddy** (auto-HTTPS) example site block concept:
 
-- `api.miracletimes.in` → `reverse_proxy 127.0.0.1:4000`
+- `api.miracletimes.in` → `reverse_proxy 127.0.0.1:4001`
 - Obtain certificates via ACME (Caddy default) or your provider’s DNS challenge
 
 **Nginx** (Ubuntu/Debian often uses Certbot):
 
-- `proxy_pass http://127.0.0.1:4000`
+- `proxy_pass http://127.0.0.1:4001`
 - TLS via Let’s Encrypt (`certbot` on Debian/Ubuntu) or the VPS panel’s
   certificate tooling
 - Forward `Host`, `X-Forwarded-For`, `X-Forwarded-Proto`

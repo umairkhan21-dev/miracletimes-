@@ -66,7 +66,7 @@ Critical and High dependency findings for production runtime are **cleared**. Ba
 | PostCSS (overridden) | **8.5.32** |
 | API | Express 4 + Zod + Helmet + MySQL (`mysql2`) |
 | Auth | HttpOnly cookie JWT + `jti` revocation denylist |
-| Prod hosting plan | Contabo Nginx → Next `127.0.0.1:3000` + API `127.0.0.1:4000` (`docs/CONTABO_DEPLOYMENT.md`) |
+| Prod hosting plan | Contabo Nginx → Next `127.0.0.1:3000` + API `127.0.0.1:4001` (`docs/CONTABO_DEPLOYMENT.md`; Drugs keeps `:4000`) |
 
 ---
 
@@ -115,7 +115,7 @@ Templates (Miracle Times only — do not overwrite Miracle Drugs vhosts):
 | Path | Purpose |
 |---|---|
 | `deploy/contabo/nginx-miracletimes.in.conf` | Proxy to Next SSR + security headers |
-| `deploy/contabo/nginx-api.miracletimes.in.conf` | API TLS proxy to `127.0.0.1:4000` |
+| `deploy/contabo/nginx-api.miracletimes.in.conf` | API TLS proxy to `127.0.0.1:4001` |
 | `deploy/contabo/miracle-times-api.service` | systemd API unit |
 | `deploy/contabo/miracle-times-web.service` | systemd Next.js unit |
 | `deploy/contabo/miracle-times-rebuild.service` | Obsolete (rollback reference only) |

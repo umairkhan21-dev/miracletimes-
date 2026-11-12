@@ -12,6 +12,10 @@ EnvironmentFile=/etc/miracle-times/api.env
 ExecStart=/usr/bin/node src/server.js
 Restart=on-failure
 RestartSec=5
+# Resource caps — keep Miracle Drugs headroom on shared Contabo VPS
+MemoryMax=512M
+CPUQuota=100%
+
 # Hardening
 NoNewPrivileges=true
 PrivateTmp=true
