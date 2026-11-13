@@ -12,6 +12,7 @@
     "start": "node src/server.js",
     "test": "node --test tests/",
     "seed:admin": "node scripts/create-admin.js",
+    "update:admin-credentials": "node scripts/update-admin-credentials.js",
     "seed:categories": "node scripts/seed-categories.js"
   },
   "dependencies": {
