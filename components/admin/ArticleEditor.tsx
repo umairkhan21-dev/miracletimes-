@@ -54,6 +54,19 @@ function emptyTranslation(languageCode: "hi" | "en"): AdminTranslation {
   };
 }
 
+function translationHasContent(item: AdminTranslation) {
+  return Boolean(
+    item.title.trim() ||
+      item.slug.trim() ||
+      item.summary.trim() ||
+      item.content.some((block) => block.text.trim()),
+  );
+}
+
+function languageLabel(code: "hi" | "en") {
+  return code === "hi" ? "Hindi" : "English";
+}
+
 function toDatetimeLocalValue(iso?: string | null) {
   if (!iso) return "";
   const date = new Date(iso);
@@ -77,7 +90,12 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [categories, setCategories] = useState<AdminCategory[]>([]);
-  const [langTab, setLangTab] = useState<"hi" | "en">("hi");
+  /** Currently edited article language — only this language is required to save/publish. */
+  const [articleLanguage, setArticleLanguage] = useState<"hi" | "en">("hi");
+  /** Languages that already exist on the saved article (edit mode). */
+  const [persistedLanguages, setPersistedLanguages] = useState<Array<"hi" | "en">>(
+    [],
+  );
 
   const [publicId, setPublicId] = useState(() => makePublicId("story"));
   const [status, setStatus] = useState<ArticleStatus>("draft");
@@ -86,10 +104,12 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const [featuredImageId, setFeaturedImageId] = useState<number | null>(null);
   const [featuredImageUrl, setFeaturedImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const feedbackRef = useRef<HTMLDivElement>(null);
+  const imageSectionRef = useRef<HTMLDivElement>(null);
   const [categoryIds, setCategoryIds] = useState<number[]>([]);
   const [tagsText, setTagsText] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
@@ -164,24 +184,34 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
         const enTranslation =
           article.translations.find((item) => item.languageCode === "en") ||
           emptyTranslation("en");
-        setHi({
+        const nextHi: AdminTranslation = {
           ...hiTranslation,
           seoTitle: hiTranslation.seoTitle || "",
           seoDescription: hiTranslation.seoDescription || "",
           content: hiTranslation.content.length
             ? hiTranslation.content
             : [{ type: "p", text: "" }],
-        });
-        setEn({
+        };
+        const nextEn: AdminTranslation = {
           ...enTranslation,
           seoTitle: enTranslation.seoTitle || "",
           seoDescription: enTranslation.seoDescription || "",
           content: enTranslation.content.length
             ? enTranslation.content
             : [{ type: "p", text: "" }],
-        });
+        };
+        setHi(nextHi);
+        setEn(nextEn);
+        const existing = article.translations
+          .map((item) => item.languageCode)
+          .filter((code): code is "hi" | "en" => code === "hi" || code === "en");
+        setPersistedLanguages(existing);
+        setArticleLanguage(existing.includes("hi") ? "hi" : existing[0] || "hi");
         // Preserve existing slugs while editing; do not auto-resync from titles.
-        setSlugLocked({ hi: true, en: true });
+        setSlugLocked({
+          hi: Boolean(nextHi.slug),
+          en: Boolean(nextEn.slug),
+        });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -197,13 +227,41 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
     };
   }, [articleId, isEdit]);
 
-  const active = langTab === "hi" ? hi : en;
-  const setActive = langTab === "hi" ? setHi : setEn;
+  const active = articleLanguage === "hi" ? hi : en;
+  const setActive = articleLanguage === "hi" ? setHi : setEn;
+  const isBilingual = persistedLanguages.length > 1;
 
   const previewHref = useMemo(() => {
-    const slug = (langTab === "hi" ? hi.slug : en.slug).trim();
+    const slug = (articleLanguage === "hi" ? hi.slug : en.slug).trim();
     return slug ? `/news/${slug}/` : null;
-  }, [langTab, hi.slug, en.slug]);
+  }, [articleLanguage, hi.slug, en.slug]);
+
+  function selectArticleLanguage(next: "hi" | "en") {
+    if (next === articleLanguage) return;
+
+    const current = articleLanguage === "hi" ? hi : en;
+    const target = next === "hi" ? hi : en;
+    const switchingAwayFromContent = translationHasContent(current);
+    const targetAlreadyPersisted = persistedLanguages.includes(next);
+    const targetHasContent = translationHasContent(target);
+
+    // Switching between existing bilingual versions keeps both; no discard.
+    if (isBilingual && targetAlreadyPersisted) {
+      setArticleLanguage(next);
+      return;
+    }
+
+    if (switchingAwayFromContent && !targetHasContent) {
+      const confirmed = window.confirm(
+        `Switch article language to ${languageLabel(next)}? ` +
+          `${languageLabel(articleLanguage)} content stays in the form if you switch back, ` +
+          `but only ${languageLabel(next)} will be saved/published.`,
+      );
+      if (!confirmed) return;
+    }
+
+    setArticleLanguage(next);
+  }
 
   const serpTitle = effectiveSeoTitle(active.seoTitle, active.title);
   const serpDescription = effectiveSeoDescription(
@@ -307,6 +365,11 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       };
     };
 
+    const selected =
+      articleLanguage === "hi"
+        ? normalizeTranslation(hi)
+        : normalizeTranslation(en);
+
     return {
       publicId: publicId.trim(),
       status: nextStatus,
@@ -317,19 +380,24 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       scheduledAt: fromDatetimeLocalValue(scheduledAtLocal),
       categoryIds,
       tags,
-      translations: [normalizeTranslation(hi), normalizeTranslation(en)],
+      // Single-language publish: only the selected language is required.
+      // Omitted sibling translations are preserved by the backend upsert.
+      translations: [selected],
     };
   }
 
   function validatePayload(payload: ArticleWritePayload) {
     if (!payload.publicId) return "Public ID is required.";
     if (!payload.categoryIds?.length) return "Select at least one category.";
+    if (!payload.translations.length) {
+      return "Select an article language and complete its content.";
+    }
     for (const translation of payload.translations) {
       if (!translation.title || !translation.slug || !translation.summary) {
-        return `Complete title, slug, and summary for ${translation.languageCode}.`;
+        return `Complete title, slug, and summary for ${languageLabel(translation.languageCode)}.`;
       }
       if (!translation.content.length) {
-        return `Add at least one content block for ${translation.languageCode}.`;
+        return `Add at least one content block for ${languageLabel(translation.languageCode)}.`;
       }
     }
     if (payload.status === "scheduled" && !payload.scheduledAt) {
@@ -353,6 +421,11 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       if (isEdit && articleId) {
         const updated = await updateAdminArticle(articleId, payload);
         setStatus(updated.status);
+        setPersistedLanguages(
+          updated.translations
+            .map((item) => item.languageCode)
+            .filter((code): code is "hi" | "en" => code === "hi" || code === "en"),
+        );
         showMessage(
           nextStatus === "draft"
             ? "Draft saved."
@@ -439,7 +512,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
 
   async function onUpload(file: File | null) {
     if (!file || uploadingImage) return;
-    setError(null);
+    setImageError(null);
     setMessage(null);
     setUploadingImage(true);
     try {
@@ -447,13 +520,21 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       const uploaded = await uploadAdminMedia(file);
       setFeaturedImageId(uploaded.id);
       setFeaturedImageUrl(uploaded.fileUrl);
+      setImageError(null);
       setMessage("Image uploaded and selected.");
     } catch (err) {
-      setError(
+      const messageText =
         err instanceof ApiError || err instanceof Error
           ? err.message
-          : "Upload failed.",
-      );
+          : "Upload failed.";
+      // Keep image upload feedback next to the featured-image control.
+      setImageError(messageText);
+      requestAnimationFrame(() => {
+        imageSectionRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
     } finally {
       setUploadingImage(false);
     }
@@ -503,7 +584,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   return (
     <AdminShell
       title={isEdit ? "Edit article" : "New article"}
-      subtitle="Bilingual Hindi / English editorial form"
+      subtitle="Publish in Hindi or English — both languages are never required"
       actions={
         <>
           {previewHref ? (
@@ -641,7 +722,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
             </div>
           </div>
 
-          <div className="admin-card admin-card-pad">
+          <div className="admin-card admin-card-pad" ref={imageSectionRef}>
             <div
               style={{
                 display: "flex",
@@ -671,10 +752,15 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 }}
               />
             </div>
+            {imageError ? (
+              <div className="admin-alert error" style={{ marginTop: 12 }} role="alert">
+                {imageError}
+              </div>
+            ) : null}
             <div
               className={`admin-dropzone ${dragActive ? "is-active" : ""} ${
                 featuredImageUrl ? "has-preview" : ""
-              }`}
+              } ${imageError ? "is-error" : ""}`}
               onDragEnter={onDragEnter}
               onDragLeave={onDragLeave}
               onDragOver={onDragOver}
@@ -704,6 +790,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                         event.stopPropagation();
                         setFeaturedImageId(null);
                         setFeaturedImageUrl(null);
+                        setImageError(null);
                         setMessage("Featured image removed.");
                       }}
                     >
@@ -728,26 +815,42 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
             </div>
           </div>
 
-          <div className="admin-tabs">
-            <button
-              type="button"
-              className={`admin-tab ${langTab === "hi" ? "is-active" : ""}`}
-              onClick={() => setLangTab("hi")}
-            >
-              Hindi
-            </button>
-            <button
-              type="button"
-              className={`admin-tab ${langTab === "en" ? "is-active" : ""}`}
-              onClick={() => setLangTab("en")}
-            >
-              English
-            </button>
+          <div className="admin-card admin-card-pad">
+            <label className="admin-label" htmlFor="article-language">
+              Article language
+            </label>
+            <div className="admin-check-row" style={{ marginTop: 10 }}>
+              <label className="admin-check">
+                <input
+                  type="radio"
+                  name="article-language"
+                  checked={articleLanguage === "hi"}
+                  onChange={() => selectArticleLanguage("hi")}
+                />
+                Hindi
+              </label>
+              <label className="admin-check">
+                <input
+                  type="radio"
+                  name="article-language"
+                  checked={articleLanguage === "en"}
+                  onChange={() => selectArticleLanguage("en")}
+                />
+                English
+              </label>
+            </div>
+            <p className="admin-muted" style={{ marginTop: 8 }}>
+              {isBilingual
+                ? "This article already has Hindi and English versions. Switch language to edit either one without removing the other."
+                : `Only ${languageLabel(articleLanguage)} content is required to save or publish.`}
+            </p>
           </div>
 
           <div className="admin-card admin-card-pad admin-form-grid two">
             <div>
-              <label className="admin-label">Title ({langTab})</label>
+              <label className="admin-label">
+                Title ({languageLabel(articleLanguage)})
+              </label>
               <input
                 className="admin-field"
                 value={active.title}
@@ -761,14 +864,16 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
               />
             </div>
             <div>
-              <label className="admin-label">Slug ({langTab})</label>
+              <label className="admin-label">
+                Slug ({languageLabel(articleLanguage)})
+              </label>
               <input
                 className="admin-field"
                 value={active.slug}
                 onChange={(event) => {
                   setSlugLocked((current) => ({
                     ...current,
-                    [langTab]: true,
+                    [articleLanguage]: true,
                   }));
                   updateTranslation({ slug: slugify(event.target.value) });
                 }}
@@ -804,11 +909,16 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
               <label className="admin-label">Image position</label>
               <input
                 className="admin-field"
-                value={active.imagePosition || "center"}
+                value={active.imagePosition ?? ""}
+                placeholder="center"
                 onChange={(event) =>
                   updateTranslation({ imagePosition: event.target.value })
                 }
               />
+              <p className="admin-muted" style={{ marginTop: 6 }}>
+                CSS focus inside the crop, e.g. center, left, right, top, or 50%
+                20%. Empty saves as center.
+              </p>
             </div>
             <div>
               <label className="admin-label">Image alt</label>
@@ -837,7 +947,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
               <div>
                 <strong>
                   Search engine settings (Optional)
-                  {langTab === "hi" ? " · Hindi" : " · English"}
+                  {` · ${languageLabel(articleLanguage)}`}
                 </strong>
                 <p className="admin-muted" style={{ margin: "6px 0 0" }}>
                   Empty fields use this language&apos;s headline and summary.
@@ -872,11 +982,14 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
             {seoOpen ? (
               <div className="admin-form-grid two" style={{ marginTop: 14 }}>
                 <div>
-                  <label className="admin-label" htmlFor={`seo-title-${langTab}`}>
+                  <label
+                    className="admin-label"
+                    htmlFor={`seo-title-${articleLanguage}`}
+                  >
                     SEO title
                   </label>
                   <input
-                    id={`seo-title-${langTab}`}
+                    id={`seo-title-${articleLanguage}`}
                     className="admin-field"
                     value={active.seoTitle || ""}
                     placeholder={
@@ -890,12 +1003,12 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 <div>
                   <label
                     className="admin-label"
-                    htmlFor={`seo-description-${langTab}`}
+                    htmlFor={`seo-description-${articleLanguage}`}
                   >
                     SEO description
                   </label>
                   <textarea
-                    id={`seo-description-${langTab}`}
+                    id={`seo-description-${articleLanguage}`}
                     className="admin-textarea"
                     rows={3}
                     value={active.seoDescription || ""}
@@ -920,7 +1033,9 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 marginBottom: 12,
               }}
             >
-              <strong>Content blocks ({langTab})</strong>
+              <strong>
+                Content blocks ({languageLabel(articleLanguage)})
+              </strong>
               <div className="admin-actions">
                 <button
                   type="button"
@@ -940,7 +1055,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
             </div>
             <div className="admin-block-list">
               {active.content.map((block, index) => (
-                <div className="admin-block" key={`${langTab}-${index}`}>
+                <div className="admin-block" key={`${articleLanguage}-${index}`}>
                   <div className="admin-block-head">
                     <select
                       className="admin-select"

@@ -29,7 +29,7 @@ export default function AdminArticlesPage() {
   const [status, setStatus] = useState<ArticleStatus | "">("");
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
-  const [language, setLanguage] = useState<"hi" | "en">("hi");
+  const [language, setLanguage] = useState<"hi" | "en" | "all">("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -125,11 +125,12 @@ export default function AdminArticlesPage() {
           value={language}
           onChange={(event) => {
             setPage(1);
-            setLanguage(event.target.value as "hi" | "en");
+            setLanguage(event.target.value as "hi" | "en" | "all");
           }}
         >
-          <option value="hi">Hindi titles</option>
-          <option value="en">English titles</option>
+          <option value="all">All languages</option>
+          <option value="hi">Hindi articles</option>
+          <option value="en">English articles</option>
         </select>
         <button className="admin-btn" type="submit">
           Search
@@ -159,13 +160,40 @@ export default function AdminArticlesPage() {
                 {articles.map((article) => {
                   const id = article.numericId;
                   const previewSlug = article.slug;
+                  const languages =
+                    article.languages?.length
+                      ? article.languages
+                      : article.language
+                        ? [article.language]
+                        : [];
+                  const languageLabel = languages.length
+                    ? languages
+                        .map((code) =>
+                          code === "hi" ? "Hindi" : code === "en" ? "English" : code,
+                        )
+                        .join(" + ")
+                    : "—";
                   return (
                     <tr key={`${article.id}-${article.language}-${article.slug}`}>
                       <td className="admin-table-title">
-                        <strong>{article.title}</strong>
-                        <div className="admin-muted">{article.slug}</div>
+                        <div className="admin-table-title-stack">
+                          <strong
+                            className="admin-table-title-text"
+                            title={article.title}
+                          >
+                            {article.title}
+                          </strong>
+                          <div
+                            className="admin-muted admin-table-title-slug"
+                            title={article.slug}
+                          >
+                            {article.slug}
+                          </div>
+                        </div>
                       </td>
-                      <td>{article.language || language}</td>
+                      <td>
+                        <span className="admin-badge">{languageLabel}</span>
+                      </td>
                       <td>{article.category || "—"}</td>
                       <td>
                         <span className={`admin-badge ${article.status || "draft"}`}>

@@ -41,7 +41,7 @@ export default function SiteLayout({ children }: { children: ReactNode }) {
       />
       {/* eslint-disable-next-line @next/next/no-page-custom-font -- runtime Google Fonts; avoids build-time next/font network dependency */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Serif+Devanagari:wght@600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,600;700;800;900&family=Fraunces:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&family=Noto+Serif+Devanagari:wght@600;700&display=swap"
         rel="stylesheet"
       />
       <LanguageProvider>

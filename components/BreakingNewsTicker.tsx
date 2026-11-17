@@ -24,6 +24,7 @@ export function BreakingNewsTicker({ items }: { items: TickerItem[] }) {
           key={`${item.slug}-${hidden ? "b" : "a"}`}
           href={demoPath(`/news/${item.slug}`)}
           className="ticker-item"
+          title={item.title}
         >
           {item.title}
         </Link>

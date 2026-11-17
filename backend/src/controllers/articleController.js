@@ -107,7 +107,7 @@ const listAdmin = asyncHandler(async (req, res) => {
     page: Number(req.query.page) || 1,
     limit: Number(req.query.limit) || 20,
     status: req.query.status,
-    language: req.query.language || "hi",
+    language: req.query.language || "all",
     search: typeof req.query.q === "string" ? req.query.q.trim() : undefined,
     actor: req.user,
   });

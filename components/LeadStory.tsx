@@ -30,7 +30,7 @@ export function LeadStory({ article }: { article: Article }) {
         <p className="kicker">
           <Link href={demoPath(`/category/${article.category}`)}>{name}</Link>
         </p>
-        <h1 className="lead-title">
+        <h1 className="lead-title" title={article.title}>
           <Link href={href}>{article.title}</Link>
         </h1>
         <p className="lead-summary">{article.summary}</p>

@@ -55,12 +55,13 @@ export default function AdminLoginPage() {
     <div className="admin-app">
       <div className="admin-login-page">
         <form className="admin-card admin-login-card" onSubmit={onSubmit}>
-          <div className="admin-brand" style={{ marginBottom: 18, color: "inherit" }}>
-            <Image src="/mark.png" alt="" width={64} height={32} />
-            <div>
-              <strong style={{ color: "#1c1915" }}>Miracle Times</strong>
-              <span style={{ color: "#6b645a" }}>Administrator sign-in</span>
-            </div>
+          <div
+            className="admin-brand"
+            style={{ marginBottom: 18, color: "inherit" }}
+          >
+            <Image src="/mark.png" alt="" width={120} height={60} />
+            <strong style={{ color: "#1c1915" }}>Miracle Times</strong>
+            <span style={{ color: "#6b645a" }}>Administrator sign-in</span>
           </div>
           <h1>Newsroom access</h1>
           <p>Sign in with the existing administrator account. Registration is disabled.</p>

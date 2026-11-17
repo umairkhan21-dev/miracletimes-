@@ -7,6 +7,7 @@ const {
   articleUpdateSchema,
   idParamSchema,
   publicListQuerySchema,
+  adminListQuerySchema,
   slugParamSchema,
   scheduleSchema,
   publishSchema,
@@ -27,6 +28,7 @@ router.get(
   "/admin",
   authenticate,
   requireRoles("admin", "editor", "author"),
+  validate(adminListQuerySchema, "query"),
   articleController.listAdmin,
 );
 router.get(

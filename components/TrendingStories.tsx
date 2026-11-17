@@ -22,7 +22,7 @@ export function TrendingStories({ articles }: { articles: Article[] }) {
           <li key={article.id}>
             <span className="trend-num">{String(index + 1).padStart(2, "0")}</span>
             <div>
-              <h3>
+              <h3 title={article.title}>
                 <Link href={demoPath(`/news/${article.slug}`)}>{article.title}</Link>
               </h3>
               <p className="meta">

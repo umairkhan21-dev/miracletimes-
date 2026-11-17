@@ -24,10 +24,8 @@ export function BrandMasthead() {
               priority
             />
           </span>
-          <span className="brand-text">
-            <span className="brand-name">{site.name}</span>
-            <span className="brand-tag">{t("brand.tagline")}</span>
-          </span>
+          <span className="brand-name">{site.name}</span>
+          <span className="brand-tag">{t("brand.tagline")}</span>
         </Link>
         <MastheadSearch />
       </div>

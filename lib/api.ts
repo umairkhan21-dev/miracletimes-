@@ -327,6 +327,11 @@ export async function fetchArticleBySlug(
 
 /**
  * Resolve a public article for the active UI language.
+ *
+ * Feed rules:
+ * - Hindi UI can read any article in its original published language.
+ * - English UI only shows English content (sibling lookup for bilingual).
+ *
  * Hindi/English translations can use different slugs; this helper
  * falls back via shared public id when the slug belongs to the other language.
  */
@@ -343,24 +348,24 @@ export async function resolveArticleForLocale(
     }
   }
 
-  if (bridge && bridge.language === language) {
+  if (!bridge) return null;
+
+  // Exact UI-language match, or Hindi mode displaying original-language content.
+  if (bridge.language === language || language === "hi") {
     return { article: bridge, canonicalSlug: bridge.slug };
   }
 
-  // Slug may belong to the other language (API resolves by slug).
-  // Find the sibling translation for the requested UI language.
-  const publicId = bridge?.id;
-  if (!publicId) return null;
-
+  // English UI + Hindi slug: prefer an English sibling when one exists.
+  const publicId = bridge.id;
   const { articles } = await fetchArticles({
-    language,
+    language: "en",
     limit: 100,
   });
   const match = articles.find((item) => item.id === publicId);
   if (!match) return null;
 
   // List payloads omit content blocks — load the canonical translation.
-  const article = await fetchArticleBySlug(match.slug, language);
+  const article = await fetchArticleBySlug(match.slug, "en");
   return { article, canonicalSlug: article.slug };
 }
 

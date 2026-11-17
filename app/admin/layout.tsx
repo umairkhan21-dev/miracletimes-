@@ -22,7 +22,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       />
       {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link
-        href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,600;700;800;900&family=Fraunces:wght@500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap"
         rel="stylesheet"
       />
       {children}

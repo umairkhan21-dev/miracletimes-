@@ -86,6 +86,15 @@ function assertCanManagePublication(actor) {
 }
 
 function mapFrontendArticle(row, blocks = [], tags = []) {
+  const languages = row.language_codes
+    ? String(row.language_codes)
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : row.language_code
+      ? [row.language_code]
+      : [];
+
   return {
     id: row.public_id,
     numericId: Number(row.id),
@@ -117,9 +126,39 @@ function mapFrontendArticle(row, blocks = [], tags = []) {
     demoRank: row.demo_rank == null ? undefined : Number(row.demo_rank),
     status: row.status,
     language: row.language_code,
+    languages,
     seoTitle: row.seo_title || undefined,
     seoDescription: row.seo_description || undefined,
   };
+}
+
+/**
+ * Public feed language rules:
+ * - en → English translations only
+ * - hi → Hindi + English articles (prefer Hindi row when bilingual)
+ *
+ * Admin list also accepts "all" (same preference as hi, no English-only filter).
+ */
+function translationJoinSql(language = "hi") {
+  if (language === "en") {
+    return `INNER JOIN article_translations t
+    ON t.article_id = a.id AND t.language_code = 'en'`;
+  }
+
+  // Hindi mode / admin "all": one row per article, prefer Hindi content.
+  return `INNER JOIN article_translations t
+    ON t.article_id = a.id
+   AND t.id = (
+     SELECT t2.id
+     FROM article_translations t2
+     WHERE t2.article_id = a.id
+     ORDER BY CASE WHEN t2.language_code = 'hi' THEN 0 ELSE 1 END, t2.id ASC
+     LIMIT 1
+   )`;
+}
+
+function translationCountJoinSql(language = "hi") {
+  return translationJoinSql(language);
 }
 
 async function loadBlocks(translationIds) {
@@ -161,13 +200,18 @@ async function loadTags(articleIds) {
   return map;
 }
 
-const listSelect = `
+const listSelectColumns = `
   SELECT
     a.id, a.public_id, a.status, a.featured, a.breaking, a.demo_rank,
     a.published_at, a.scheduled_at, a.created_at, a.updated_at,
     t.id AS translation_id, t.language_code, t.slug, t.title, t.summary,
     t.author_display_name, t.image_alt, t.image_caption, t.image_position,
     t.seo_title, t.seo_description,
+    (
+      SELECT GROUP_CONCAT(lt.language_code ORDER BY lt.language_code ASC SEPARATOR ',')
+      FROM article_translations lt
+      WHERE lt.article_id = a.id
+    ) AS language_codes,
     m.file_url,
     u.name AS author_name,
     (
@@ -191,11 +235,15 @@ const listSelect = `
       WHERE atg.article_id = a.id
     ) AS tag_names
   FROM articles a
-  INNER JOIN article_translations t
-    ON t.article_id = a.id AND t.language_code = :language
+`;
+
+function buildListSelect(language = "hi") {
+  return `${listSelectColumns}
+  ${translationJoinSql(language)}
   LEFT JOIN media m ON m.id = a.featured_image_id
   LEFT JOIN users u ON u.id = a.author_id
 `;
+}
 
 async function hydrateArticles(rows, { includeContent = false } = {}) {
   const translationIds = rows.map((row) => Number(row.translation_id));
@@ -225,9 +273,10 @@ async function listPublishedArticles({
   search,
   includeContent = false,
 } = {}) {
+  const feedLanguage = language === "en" ? "en" : "hi";
   const pagination = parsePagination({ page, limit });
   const where = [PUBLISHED_WHERE];
-  const params = { language };
+  const params = {};
 
   if (categorySlug) {
     where.push(`EXISTS (
@@ -273,17 +322,17 @@ async function listPublishedArticles({
   }
 
   const whereSql = where.join(" AND ");
+  const joinSql = translationCountJoinSql(feedLanguage);
   const countRows = await query(
     `SELECT COUNT(*) AS total
      FROM articles a
-     INNER JOIN article_translations t
-       ON t.article_id = a.id AND t.language_code = :language
+     ${joinSql}
      WHERE ${whereSql}`,
     params,
   );
 
   const rows = await query(
-    `${listSelect}
+    `${buildListSelect(feedLanguage)}
      WHERE ${whereSql}
      ORDER BY a.published_at DESC, a.id DESC
      LIMIT ${pagination.limit} OFFSET ${pagination.offset}`,
@@ -346,12 +395,12 @@ async function getPublishedBySlug(slug, language = "hi") {
 }
 
 async function getTrending(language = "hi", limit = 8) {
+  const feedLanguage = language === "en" ? "en" : "hi";
   const rows = await query(
-    `${listSelect}
+    `${buildListSelect(feedLanguage)}
      WHERE ${PUBLISHED_WHERE} AND a.demo_rank IS NOT NULL
      ORDER BY a.demo_rank ASC, a.published_at DESC
      LIMIT ${Number(limit)}`,
-    { language },
   );
   return hydrateArticles(rows);
 }
@@ -733,13 +782,15 @@ async function listAdminArticles({
   page = 1,
   limit = 20,
   status,
-  language = "hi",
+  language = "all",
   search,
   actor,
 } = {}) {
   const pagination = parsePagination({ page, limit });
   const where = ["1=1"];
-  const params = { language };
+  const params = {};
+  const feedLanguage =
+    language === "en" ? "en" : language === "hi" ? "hi" : "all";
 
   if (actor?.role === "author") {
     where.push("a.author_id = :ownerId");
@@ -761,17 +812,27 @@ async function listAdminArticles({
     params.search = `%${search}%`;
   }
 
+  // "all" and "hi" both use preferred-translation join; "hi" additionally
+  // requires a Hindi row so English-only drafts can be filtered out.
+  if (feedLanguage === "hi") {
+    where.push(`EXISTS (
+      SELECT 1 FROM article_translations ht
+      WHERE ht.article_id = a.id AND ht.language_code = 'hi'
+    )`);
+  }
+
+  const joinLanguage = feedLanguage === "en" ? "en" : "all";
   const whereSql = where.join(" AND ");
+  const joinSql = translationCountJoinSql(joinLanguage);
   const countRows = await query(
     `SELECT COUNT(*) AS total
      FROM articles a
-     INNER JOIN article_translations t
-       ON t.article_id = a.id AND t.language_code = :language
+     ${joinSql}
      WHERE ${whereSql}`,
     params,
   );
   const rows = await query(
-    `${listSelect}
+    `${buildListSelect(joinLanguage)}
      WHERE ${whereSql}
      ORDER BY a.updated_at DESC, a.id DESC
      LIMIT ${pagination.limit} OFFSET ${pagination.offset}`,

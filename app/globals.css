@@ -12,6 +12,8 @@
   --serif: "Noto Serif Devanagari", Georgia, serif;
   --sans: "Noto Sans Devanagari", sans-serif;
   --display: "Fraunces", Georgia, serif;
+  /* Condensed newspaper masthead style for the Miracle Times wordmark */
+  --masthead: "Bodoni Moda", "Times New Roman", Times, serif;
 }
 
 * { box-sizing: border-box; }
@@ -173,9 +175,16 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .brand-lockup,
 .footer-lockup {
-  display: flex;
+  --brand-size: clamp(1.45rem, 2.8vw, 2.2rem);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "mark name"
+    ". tag";
+  column-gap: 5px;
+  row-gap: 2px;
+  /* Center mark against name row only (tag sits on row 2) */
   align-items: center;
-  gap: 12px;
   min-width: 0;
   color: inherit;
 }
@@ -184,32 +193,53 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 .footer-lockup:hover { color: inherit; }
 
 .brand-mark {
-  display: flex;
-  background: transparent;
+  grid-area: mark;
+  display: block;
+  background: #fff;
   padding: 0;
-  flex: none;
+  border-radius: 2px;
+  line-height: 0;
+  /* Shared em box with .brand-name; img inset to Bodoni ink */
+  height: 1em;
+  font-size: var(--brand-size);
+  align-self: start;
 }
 
 .brand-mark img,
 .brand-logo {
   display: block;
-  width: 86px;
-  height: 43px;
+  width: auto;
+  height: 0.72em;
+  margin-top: 0.13em;
   object-fit: contain;
+  object-position: left center;
+  background: #fff;
 }
 
 .brand-name {
+  grid-area: name;
   display: block;
-  font-family: var(--display);
-  font-weight: 600;
-  font-size: clamp(1.35rem, 2.5vw, 2.15rem);
-  letter-spacing: -0.03em;
-  line-height: 0.95;
+  width: max-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: var(--masthead);
+  font-optical-sizing: auto;
+  font-weight: 800;
+  font-size: var(--brand-size);
+  letter-spacing: -0.055em;
+  line-height: 1;
+  text-transform: uppercase;
+  font-stretch: condensed;
+  transform: scaleX(0.86);
+  transform-origin: left center;
+  align-self: start;
 }
 
 .brand-tag {
+  grid-area: tag;
   display: block;
-  margin-top: 5px;
+  margin: 0;
   color: var(--muted);
   font-size: 0.88rem;
   line-height: 1.35;
@@ -331,7 +361,10 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   align-items: center;
   gap: 8px;
   min-height: 44px;
+  max-width: min(36rem, 70vw);
   padding: 6px 22px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -424,10 +457,43 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .kicker a { color: var(--red); }
 
+/* Shared headline truncation for listings/cards (not article detail h1). */
+.headline-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.headline-clamp-2 {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.headline-clamp-3 {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.headline-clamp-4 {
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
+
 .lead-title {
   margin: 0 0 10px;
   font-size: clamp(1.85rem, 3.3vw, 2.8rem);
   line-height: 1.28;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .lead-summary {
@@ -435,6 +501,11 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   font-size: 1.05rem;
   line-height: 1.7;
   margin-bottom: 10px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }
 
 .meta {
@@ -469,6 +540,14 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   margin: 0 0 4px;
   font-size: 1.05rem;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .latest-col,
@@ -549,9 +628,25 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .card-body { padding-top: 10px; }
 
-.card-title { margin: 0 0 8px; font-size: 1.12rem; line-height: 1.4; }
+.card-title {
+  margin: 0 0 8px;
+  font-size: 1.12rem;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
-.story-card--feature .card-title { font-size: clamp(1.3rem, 2vw, 1.65rem); }
+.story-card--feature .card-title {
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+}
 
 .card-summary {
   margin: 0 0 8px;
@@ -773,6 +868,14 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   font-family: var(--serif);
   font-size: 1.02rem;
   line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .story-more { margin-top: 28px; }
@@ -942,13 +1045,27 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
     white-space: nowrap;
   }
   .wrap { width: min(1120px, calc(100% - 24px)); }
-  .brand-logo { width: 72px; height: 36px; }
+  .brand-lockup,
+  .footer-lockup { --brand-size: clamp(1.25rem, 5.5vw, 1.7rem); }
   .support-card { grid-template-columns: 96px minmax(0, 1fr); }
   .story-card--row { grid-template-columns: 104px minmax(0, 1fr); }
+  .lead-title {
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+  .card-title,
+  .story-card--feature .card-title {
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .ticker-item {
+    max-width: min(28rem, 78vw);
+  }
 }
 
 @media (max-width: 380px) {
-  .brand-name { font-size: 1.22rem; }
+  .brand-lockup,
+  .footer-lockup { --brand-size: 1.25rem; }
   .brand-tag { font-size: 0.78rem; }
   .ticker-label { font-size: 0.72rem; }
 }
@@ -1008,7 +1125,17 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   .ticker-track { animation: none; width: auto; flex-direction: column; }
   .ticker-viewport { overflow: visible; }
   .ticker-group[aria-hidden="true"] { display: none; }
-  .ticker-item { white-space: normal; padding-inline: 0; }
+  .ticker-item {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    max-width: none;
+    white-space: normal;
+    padding-inline: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .ticker-inner { align-items: flex-start; flex-wrap: wrap; padding-block: 8px; }
   *,
   *::before,
@@ -1046,6 +1173,18 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
   color: inherit;
   text-decoration: none;
   font-weight: 600;
+}
+
+.archive-story-list a {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .archive-story-list li {

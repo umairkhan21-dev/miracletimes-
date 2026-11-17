@@ -42,20 +42,39 @@ const articleBaseObject = z.object({
   translations: z.array(translationSchema).min(1),
 });
 
-const articleWriteSchema = articleBaseObject.refine(
-  (value) =>
-    (value.categoryIds && value.categoryIds.length > 0) ||
-    (value.categorySlugs && value.categorySlugs.length > 0),
-  { message: "At least one categoryIds or categorySlugs entry is required" },
-);
+function hasUniqueLanguageCodes(translations) {
+  if (!translations?.length) return true;
+  const codes = translations.map((item) => item.languageCode);
+  return new Set(codes).size === codes.length;
+}
 
-const articleUpdateSchema = articleBaseObject.partial().extend({
-  translations: z.array(translationSchema).min(1).optional(),
-});
+const articleWriteSchema = articleBaseObject
+  .refine(
+    (value) =>
+      (value.categoryIds && value.categoryIds.length > 0) ||
+      (value.categorySlugs && value.categorySlugs.length > 0),
+    { message: "At least one categoryIds or categorySlugs entry is required" },
+  )
+  .refine((value) => hasUniqueLanguageCodes(value.translations), {
+    message: "translations must not contain duplicate languageCode values",
+    path: ["translations"],
+  });
+
+const articleUpdateSchema = articleBaseObject
+  .partial()
+  .extend({
+    translations: z.array(translationSchema).min(1).optional(),
+  })
+  .refine((value) => hasUniqueLanguageCodes(value.translations), {
+    message: "translations must not contain duplicate languageCode values",
+    path: ["translations"],
+  });
 
 const idParamSchema = z.object({
   id: z.coerce.number().int().positive(),
 });
+
+const adminListLanguage = z.enum(["hi", "en", "all"]);
 
 const publicListQuerySchema = z.object({
   language: languageCode.optional().default("hi"),
@@ -78,6 +97,14 @@ const publicListQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
 });
 
+const adminListQuerySchema = z.object({
+  language: adminListLanguage.optional().default("all"),
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(100).optional().default(20),
+  status: z.enum(["draft", "scheduled", "published", "archived"]).optional(),
+  q: z.string().trim().max(200).optional(),
+});
+
 const slugParamSchema = z.object({
   slug: z.string().trim().min(1).max(280),
 });
@@ -95,6 +122,7 @@ module.exports = {
   articleUpdateSchema,
   idParamSchema,
   publicListQuerySchema,
+  adminListQuerySchema,
   slugParamSchema,
   scheduleSchema,
   publishSchema,

@@ -66,6 +66,7 @@ export type AdminArticleListItem = {
   breaking?: boolean;
   status?: ArticleStatus;
   language?: string;
+  languages?: string[];
   tags?: string[];
   image?: string;
 };

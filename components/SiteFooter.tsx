@@ -19,10 +19,8 @@ export function SiteFooter() {
             <span className="brand-mark">
               <Image className="brand-logo" src="/mark.png" alt="" width={428} height={214} />
             </span>
-            <span>
-              <span className="brand-name">{site.name}</span>
-              <span className="brand-tag">{t("brand.tagline")}</span>
-            </span>
+            <span className="brand-name">{site.name}</span>
+            <span className="brand-tag">{t("brand.tagline")}</span>
           </Link>
           <p>{t("brand.footerAbout")}</p>
         </div>

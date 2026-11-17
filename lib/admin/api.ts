@@ -105,7 +105,7 @@ export async function fetchAdminArticles(params: {
   page?: number;
   limit?: number;
   status?: ArticleStatus | "";
-  language?: "hi" | "en";
+  language?: "hi" | "en" | "all";
   q?: string;
 } = {}) {
   const { data, meta } = await adminRequest<AdminArticleListItem[]>(
@@ -113,7 +113,7 @@ export async function fetchAdminArticles(params: {
       page: params.page ?? 1,
       limit: params.limit ?? 20,
       status: params.status || undefined,
-      language: params.language ?? "hi",
+      language: params.language ?? "all",
       q: params.q,
     })}`,
   );

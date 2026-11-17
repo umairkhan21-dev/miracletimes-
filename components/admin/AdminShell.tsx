@@ -108,11 +108,9 @@ export function AdminShell({
       <div className="admin-shell">
         <aside className="admin-sidebar">
           <div className="admin-brand">
-            <Image src="/mark.png" alt="" width={64} height={32} />
-            <div>
-              <strong>Miracle Times</strong>
-              <span>Newsroom admin</span>
-            </div>
+            <Image src="/mark.png" alt="" width={120} height={60} />
+            <strong>Miracle Times</strong>
+            <span>Newsroom admin</span>
           </div>
           <nav className="admin-nav" aria-label="Admin">
             {NAV.map((item) => {

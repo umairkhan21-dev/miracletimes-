@@ -29,7 +29,7 @@ export function ArchiveYearView({
         <ul className="archive-story-list">
           {articles.map((article) => (
             <li key={article.id}>
-              <Link href={demoPath(`/news/${article.slug}`)}>
+              <Link href={demoPath(`/news/${article.slug}`)} title={article.title}>
                 {article.title}
               </Link>
               <time dateTime={article.publishedAt}>

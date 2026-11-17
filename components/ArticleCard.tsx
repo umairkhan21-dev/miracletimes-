@@ -56,7 +56,9 @@ export function ArticleCard({
           {formatTime(article.publishedAt, locale)}
         </time>
         <div>
-          <Link href={href}>{article.title}</Link>
+          <Link href={href} title={article.title}>
+            {article.title}
+          </Link>
           <span className="rail-cat">{name}</span>
         </div>
       </li>
@@ -80,7 +82,7 @@ export function ArticleCard({
           <p className="kicker">
             <Link href={categoryHref}>{name}</Link>
           </p>
-          <Title>
+          <Title title={article.title}>
             <Link href={href}>{article.title}</Link>
           </Title>
           <time className="meta" dateTime={article.publishedAt}>
@@ -108,7 +110,7 @@ export function ArticleCard({
           <p className="kicker">
             <Link href={categoryHref}>{name}</Link>
           </p>
-          <Title>
+          <Title title={article.title}>
             <Link href={href}>{article.title}</Link>
           </Title>
           <time className="meta" dateTime={article.publishedAt}>
@@ -142,7 +144,7 @@ export function ArticleCard({
         <p className="kicker">
           <Link href={categoryHref}>{name}</Link>
         </p>
-        <Title className="card-title">
+        <Title className="card-title" title={article.title}>
           <Link href={href}>{article.title}</Link>
         </Title>
         {variant !== "grid" || article.summary ? (

@@ -21,7 +21,7 @@ export default function AdminDashboardPage() {
     setLoading(true);
     Promise.all([
       fetchArticleStatusCounts(),
-      fetchAdminArticles({ page: 1, limit: 6, language: "hi" }),
+      fetchAdminArticles({ page: 1, limit: 6, language: "all" }),
     ])
       .then(([nextCounts, list]) => {
         if (cancelled) return;

@@ -36,19 +36,25 @@ const mediaHosts = [
     .filter(Boolean),
 ];
 
+const isDev = process.env.NODE_ENV !== "production";
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  // JSON-LD remains inline; language boot is /lang-boot.js
-  "script-src 'self' 'unsafe-inline'",
+  // JSON-LD remains inline; language boot is /lang-boot.js.
+  // Next.js Fast Refresh needs 'unsafe-eval' in development only.
+  isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   `img-src 'self' data: blob: ${apiOrigin} https:`,
   `connect-src 'self' ${apiOrigin}`,
-  "upgrade-insecure-requests",
+  // Avoid forcing HTTPS upgrades against local http://localhost.
+  ...(isDev ? [] : ["upgrade-insecure-requests"]),
 ].join("; ");
 
 const nextConfig: NextConfig = {

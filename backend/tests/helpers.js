@@ -147,6 +147,53 @@ function sampleWritePayload({
   };
 }
 
+function singleLanguageWritePayload({
+  publicId,
+  categoryId,
+  languageCode = "hi",
+  status = "draft",
+  slug,
+  title,
+  summary,
+  publishedAt,
+  scheduledAt,
+} = {}) {
+  const isHindi = languageCode === "hi";
+  return {
+    publicId,
+    status,
+    featured: false,
+    breaking: false,
+    categoryIds: categoryId ? [categoryId] : undefined,
+    categorySlugs: categoryId ? undefined : ["business"],
+    publishedAt: publishedAt ?? undefined,
+    scheduledAt: scheduledAt ?? undefined,
+    tags: ["language-test"],
+    translations: [
+      {
+        languageCode,
+        slug: slug || `${languageCode}-${publicId}`,
+        title:
+          title ||
+          (isHindi ? "केवल हिंदी लेख" : "English-only article"),
+        summary:
+          summary ||
+          (isHindi
+            ? "यह लेख केवल हिंदी में प्रकाशित है।"
+            : "This article is published in English only."),
+        content: [
+          {
+            type: "p",
+            text: isHindi
+              ? "यह एक हिंदी-मात्र परीक्षण अनुच्छेद है।"
+              : "This is an English-only test paragraph.",
+          },
+        ],
+      },
+    ],
+  };
+}
+
 module.exports = {
   startTestServer,
   createTestUser,
@@ -156,4 +203,5 @@ module.exports = {
   bearerHeaders,
   cookieHeaders,
   sampleWritePayload,
+  singleLanguageWritePayload,
 };

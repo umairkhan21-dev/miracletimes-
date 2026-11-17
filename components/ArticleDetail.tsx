@@ -92,6 +92,11 @@ export function ArticleDetail({ slug, initialBundle = null }: Props) {
         if (cancelled) return;
 
         if (!resolved) {
+          // English UI + Hindi-only article: leave the broken translation view.
+          if (locale === "en") {
+            router.replace(demoPath("/latest/"));
+            return;
+          }
           setState({ status: "missing" });
           return;
         }
@@ -231,7 +236,7 @@ export function ArticleDetail({ slug, initialBundle = null }: Props) {
           {older ? (
             <Link href={demoPath(`/news/${older.slug}`)} className="story-pager-link">
               <span>{t("article.prev")}</span>
-              <strong>{older.title}</strong>
+              <strong title={older.title}>{older.title}</strong>
             </Link>
           ) : (
             <span />
@@ -239,7 +244,7 @@ export function ArticleDetail({ slug, initialBundle = null }: Props) {
           {newer ? (
             <Link href={demoPath(`/news/${newer.slug}`)} className="story-pager-link is-next">
               <span>{t("article.next")}</span>
-              <strong>{newer.title}</strong>
+              <strong title={newer.title}>{newer.title}</strong>
             </Link>
           ) : null}
         </nav>
