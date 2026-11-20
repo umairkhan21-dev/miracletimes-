@@ -2,6 +2,27 @@ const { z } = require("zod");
 
 const languageCode = z.enum(["hi", "en"]);
 
+/** True when the ISO datetime falls on today (UTC) or a later calendar day. */
+function isOnOrAfterToday(iso) {
+  if (iso == null || iso === "") return true;
+  const value = Date.parse(iso);
+  if (Number.isNaN(value)) return false;
+  const now = new Date();
+  const startOfTodayUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+  return value >= startOfTodayUtc;
+}
+
+const notPastDatetime = z
+  .string()
+  .datetime()
+  .refine(isOnOrAfterToday, {
+    message: "must be today or a future date",
+  });
+
 const contentBlockSchema = z.object({
   type: z.enum(["p", "h2"]),
   text: z.string().trim().min(1).max(20000),
@@ -34,8 +55,8 @@ const articleBaseObject = z.object({
   demoRank: z.number().int().positive().nullable().optional(),
   featuredImageId: z.number().int().positive().nullable().optional(),
   authorId: z.number().int().positive().optional(),
-  publishedAt: z.string().datetime().optional().nullable(),
-  scheduledAt: z.string().datetime().optional().nullable(),
+  publishedAt: notPastDatetime.optional().nullable(),
+  scheduledAt: notPastDatetime.optional().nullable(),
   categoryIds: z.array(z.number().int().positive()).optional(),
   categorySlugs: z.array(z.string().trim().min(1).max(120)).optional(),
   tags: z.array(z.string().trim().min(1).max(100)).max(30).optional(),
@@ -110,11 +131,11 @@ const slugParamSchema = z.object({
 });
 
 const scheduleSchema = z.object({
-  scheduledAt: z.string().datetime(),
+  scheduledAt: notPastDatetime,
 });
 
 const publishSchema = z.object({
-  publishedAt: z.string().datetime().optional(),
+  publishedAt: notPastDatetime.optional(),
 });
 
 module.exports = {

@@ -276,9 +276,22 @@ export default function AdminArticlesPage() {
                               disabled={busyId === id}
                               onClick={() => {
                                 const value = window.prompt(
-                                  "Schedule for (ISO datetime, e.g. 2026-11-05T10:00:00.000Z)",
+                                  "Schedule for (ISO datetime, today or later, e.g. 2026-11-20T10:00:00.000Z)",
                                 );
                                 if (!value) return;
+                                const scheduled = new Date(value);
+                                if (Number.isNaN(scheduled.getTime())) {
+                                  setError("Invalid schedule datetime.");
+                                  return;
+                                }
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                if (scheduled.getTime() < today.getTime()) {
+                                  setError(
+                                    "Schedule date must be today or a future date.",
+                                  );
+                                  return;
+                                }
                                 void runAction(
                                   id,
                                   () => scheduleAdminArticle(id, value),

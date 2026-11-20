@@ -484,6 +484,20 @@
   font-weight: 600;
 }
 
+.admin-label-subtle {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--admin-ink) 62%, transparent);
+}
+
+.admin-datetime-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .admin-password-field {
   display: flex;
   align-items: center;

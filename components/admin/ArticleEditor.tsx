@@ -82,6 +82,98 @@ function fromDatetimeLocalValue(value: string) {
   return date.toISOString();
 }
 
+/** Local calendar today (YYYY-MM-DD) — earliest selectable date. */
+function minDateValue() {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+function splitDatetimeLocal(value: string): { date: string; time: string } {
+  if (!value) return { date: "", time: "" };
+  const [date = "", timePart = ""] = value.split("T");
+  return { date, time: timePart.slice(0, 5) };
+}
+
+function joinDatetimeLocal(date: string, time: string): string {
+  if (!date) return "";
+  return `${date}T${time || "00:00"}`;
+}
+
+function isOnOrAfterTodayLocal(value: string) {
+  if (!value) return true;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date.getTime() >= today.getTime();
+}
+
+function DatetimeFields({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const { date, time } = splitDatetimeLocal(value);
+  const minDate = minDateValue();
+
+  return (
+    <div>
+      <span className="admin-label" id={`${id}-label`}>
+        {label}
+      </span>
+      <div
+        className="admin-datetime-fields"
+        role="group"
+        aria-labelledby={`${id}-label`}
+      >
+        <div>
+          <label className="admin-label-subtle" htmlFor={`${id}-date`}>
+            Date
+          </label>
+          <input
+            id={`${id}-date`}
+            className="admin-field"
+            type="date"
+            min={minDate}
+            value={date}
+            onChange={(event) => {
+              const nextDate = event.target.value;
+              if (!nextDate) {
+                onChange("");
+                return;
+              }
+              onChange(joinDatetimeLocal(nextDate, time || "00:00"));
+            }}
+          />
+        </div>
+        <div>
+          <label className="admin-label-subtle" htmlFor={`${id}-time`}>
+            Time
+          </label>
+          <input
+            id={`${id}-time`}
+            className="admin-field"
+            type="time"
+            value={time}
+            disabled={!date}
+            onChange={(event) => {
+              const nextTime = event.target.value;
+              onChange(joinDatetimeLocal(date || minDate, nextTime));
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ArticleEditor({ articleId }: { articleId?: number }) {
   const router = useRouter();
   const isEdit = typeof articleId === "number";
@@ -114,6 +206,9 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const [tagsText, setTagsText] = useState("");
   const [publishedAtLocal, setPublishedAtLocal] = useState("");
   const [scheduledAtLocal, setScheduledAtLocal] = useState("");
+  /** Loaded values — unchanged historical datetimes are preserved on save. */
+  const [originalPublishedAtLocal, setOriginalPublishedAtLocal] = useState("");
+  const [originalScheduledAtLocal, setOriginalScheduledAtLocal] = useState("");
   const [hi, setHi] = useState<AdminTranslation>(() => emptyTranslation("hi"));
   const [en, setEn] = useState<AdminTranslation>(() => emptyTranslation("en"));
   /** Once true for a language, title edits no longer overwrite the slug. */
@@ -176,8 +271,12 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
         );
         setCategoryIds(article.categories.map((item) => item.id));
         setTagsText((article.tags || []).join(", "));
-        setPublishedAtLocal(toDatetimeLocalValue(article.publishedAt));
-        setScheduledAtLocal(toDatetimeLocalValue(article.scheduledAt));
+        const publishedLocal = toDatetimeLocalValue(article.publishedAt);
+        const scheduledLocal = toDatetimeLocalValue(article.scheduledAt);
+        setPublishedAtLocal(publishedLocal);
+        setScheduledAtLocal(scheduledLocal);
+        setOriginalPublishedAtLocal(publishedLocal);
+        setOriginalScheduledAtLocal(scheduledLocal);
         const hiTranslation =
           article.translations.find((item) => item.languageCode === "hi") ||
           emptyTranslation("hi");
@@ -370,14 +469,26 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
         ? normalizeTranslation(hi)
         : normalizeTranslation(en);
 
+    const publishedAtChanged = publishedAtLocal !== originalPublishedAtLocal;
+    const scheduledAtChanged = scheduledAtLocal !== originalScheduledAtLocal;
+
     return {
       publicId: publicId.trim(),
       status: nextStatus,
       featured,
       breaking,
       featuredImageId,
-      publishedAt: fromDatetimeLocalValue(publishedAtLocal),
-      scheduledAt: fromDatetimeLocalValue(scheduledAtLocal),
+      // Omit unchanged datetimes on edit so historical values are not re-validated.
+      publishedAt: !isEdit
+        ? fromDatetimeLocalValue(publishedAtLocal)
+        : publishedAtChanged
+          ? fromDatetimeLocalValue(publishedAtLocal)
+          : undefined,
+      scheduledAt: !isEdit
+        ? fromDatetimeLocalValue(scheduledAtLocal)
+        : scheduledAtChanged
+          ? fromDatetimeLocalValue(scheduledAtLocal)
+          : undefined,
       categoryIds,
       tags,
       // Single-language publish: only the selected language is required.
@@ -400,8 +511,25 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
         return `Add at least one content block for ${languageLabel(translation.languageCode)}.`;
       }
     }
-    if (payload.status === "scheduled" && !payload.scheduledAt) {
+    if (payload.status === "scheduled" && !payload.scheduledAt && !scheduledAtLocal) {
       return "Scheduled articles need a schedule date.";
+    }
+    if (publishedAtLocal && publishedAtLocal !== originalPublishedAtLocal) {
+      if (!isOnOrAfterTodayLocal(publishedAtLocal)) {
+        return "Published at must be today or a future date.";
+      }
+    }
+    if (scheduledAtLocal && scheduledAtLocal !== originalScheduledAtLocal) {
+      if (!isOnOrAfterTodayLocal(scheduledAtLocal)) {
+        return "Scheduled at must be today or a future date.";
+      }
+    }
+    if (
+      payload.status === "scheduled" &&
+      scheduledAtLocal &&
+      !isOnOrAfterTodayLocal(scheduledAtLocal)
+    ) {
+      return "Scheduled at must be today or a future date.";
     }
     return null;
   }
@@ -421,6 +549,8 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       if (isEdit && articleId) {
         const updated = await updateAdminArticle(articleId, payload);
         setStatus(updated.status);
+        setOriginalPublishedAtLocal(publishedAtLocal);
+        setOriginalScheduledAtLocal(scheduledAtLocal);
         setPersistedLanguages(
           updated.translations
             .map((item) => item.languageCode)
@@ -446,6 +576,10 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   }
 
   async function publishNow() {
+    if (publishedAtLocal && !isOnOrAfterTodayLocal(publishedAtLocal)) {
+      showError("Published at must be today or a future date.");
+      return;
+    }
     if (!isEdit || !articleId) {
       await save("published");
       return;
@@ -464,11 +598,13 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
     try {
       // Save content first, then flip status via /publish so published_at is set.
       await updateAdminArticle(articleId, payload);
-      await publishAdminArticle(
-        articleId,
-        fromDatetimeLocalValue(publishedAtLocal) || undefined,
-      );
+      const publishedAt =
+        publishedAtLocal && isOnOrAfterTodayLocal(publishedAtLocal)
+          ? fromDatetimeLocalValue(publishedAtLocal) || undefined
+          : undefined;
+      await publishAdminArticle(articleId, publishedAt);
       setStatus("published");
+      setOriginalPublishedAtLocal(publishedAtLocal);
       showMessage("Article published.");
     } catch (err) {
       showError(err instanceof ApiError ? err.message : "Publish failed.");
@@ -481,6 +617,10 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
     const scheduledAt = fromDatetimeLocalValue(scheduledAtLocal);
     if (!scheduledAt) {
       showError("Choose a schedule date before scheduling.");
+      return;
+    }
+    if (!isOnOrAfterTodayLocal(scheduledAtLocal)) {
+      showError("Scheduled at must be today or a future date.");
       return;
     }
     if (!isEdit || !articleId) {
@@ -502,6 +642,7 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
       await updateAdminArticle(articleId, payload);
       await scheduleAdminArticle(articleId, scheduledAt);
       setStatus("scheduled");
+      setOriginalScheduledAtLocal(scheduledAtLocal);
       showMessage("Article scheduled.");
     } catch (err) {
       showError(err instanceof ApiError ? err.message : "Schedule failed.");
@@ -644,30 +785,18 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
                 <option value="archived">archived</option>
               </select>
             </div>
-            <div>
-              <label className="admin-label" htmlFor="published-at">
-                Published at
-              </label>
-              <input
-                id="published-at"
-                className="admin-field"
-                type="datetime-local"
-                value={publishedAtLocal}
-                onChange={(event) => setPublishedAtLocal(event.target.value)}
-              />
-            </div>
-            <div>
-              <label className="admin-label" htmlFor="scheduled-at">
-                Scheduled at
-              </label>
-              <input
-                id="scheduled-at"
-                className="admin-field"
-                type="datetime-local"
-                value={scheduledAtLocal}
-                onChange={(event) => setScheduledAtLocal(event.target.value)}
-              />
-            </div>
+            <DatetimeFields
+              id="published-at"
+              label="Published at"
+              value={publishedAtLocal}
+              onChange={setPublishedAtLocal}
+            />
+            <DatetimeFields
+              id="scheduled-at"
+              label="Scheduled at"
+              value={scheduledAtLocal}
+              onChange={setScheduledAtLocal}
+            />
             <div className="admin-check-row">
               <label className="admin-check">
                 <input
