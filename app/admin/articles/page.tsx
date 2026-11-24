@@ -225,7 +225,21 @@ export default function AdminArticlesPage() {
                               Edit
                             </Link>
                           ) : null}
-                          {previewSlug ? (
+                          {id ? (
+                            <a
+                              className="admin-btn admin-btn-sm"
+                              href={`/admin/articles/preview/?id=${id}${
+                                article.language === "en" ||
+                                article.language === "hi"
+                                  ? `&lang=${article.language}`
+                                  : ""
+                              }`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Preview
+                            </a>
+                          ) : previewSlug ? (
                             <a
                               className="admin-btn admin-btn-sm"
                               href={`/news/${previewSlug}/`}

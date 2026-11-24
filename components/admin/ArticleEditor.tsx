@@ -331,9 +331,11 @@ export function ArticleEditor({ articleId }: { articleId?: number }) {
   const isBilingual = persistedLanguages.length > 1;
 
   const previewHref = useMemo(() => {
+    if (!isEdit || !articleId) return null;
     const slug = (articleLanguage === "hi" ? hi.slug : en.slug).trim();
-    return slug ? `/news/${slug}/` : null;
-  }, [articleLanguage, hi.slug, en.slug]);
+    if (!slug) return null;
+    return `/admin/articles/preview/?id=${articleId}&lang=${articleLanguage}`;
+  }, [isEdit, articleId, articleLanguage, hi.slug, en.slug]);
 
   function selectArticleLanguage(next: "hi" | "en") {
     if (next === articleLanguage) return;

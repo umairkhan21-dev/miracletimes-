@@ -930,6 +930,112 @@
   }
 }
 
+.admin-article-preview {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-preview-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, #b45309 28%, var(--admin-line));
+  border-radius: 12px;
+  background: color-mix(in srgb, #f59e0b 12%, #fff);
+}
+
+.admin-preview-banner strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.admin-preview-banner span {
+  color: color-mix(in srgb, var(--admin-ink) 68%, transparent);
+  font-size: 0.92rem;
+}
+
+.admin-preview-banner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-article-preview .article-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 8px 0 24px;
+  color: var(--admin-ink);
+}
+
+.admin-article-preview .story-header h1 {
+  margin: 0.2em 0 0.45em;
+  font-family: "Bodoni Moda", "Fraunces", Georgia, serif;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+  line-height: 1.15;
+}
+
+.admin-article-preview .kicker {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--admin-ink) 62%, transparent);
+}
+
+.admin-article-preview .story-dek {
+  margin: 0 0 0.8em;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  color: color-mix(in srgb, var(--admin-ink) 78%, transparent);
+}
+
+.admin-article-preview .story-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  margin: 0 0 1.2em;
+  font-size: 0.92rem;
+  color: color-mix(in srgb, var(--admin-ink) 65%, transparent);
+}
+
+.admin-article-preview .story-figure {
+  margin: 0 0 1.2em;
+}
+
+.admin-article-preview .story-figure figcaption {
+  margin-top: 0.45em;
+  font-size: 0.88rem;
+  color: color-mix(in srgb, var(--admin-ink) 62%, transparent);
+}
+
+.admin-article-preview .media-lead {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #ece7dc;
+  aspect-ratio: 16 / 9;
+}
+
+.admin-article-preview .story-body p,
+.admin-article-preview .story-body h2 {
+  margin: 0 0 1em;
+}
+
+.admin-article-preview .story-body p {
+  font-size: 1.08rem;
+  line-height: 1.8;
+}
+
+.admin-article-preview .story-body h2 {
+  margin-top: 1.25em;
+  font-size: 1.3rem;
+  line-height: 1.25;
+}
+
 @media (max-width: 640px) {
   .admin-topbar-end {
     width: 100%;
