@@ -421,7 +421,7 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .media-square { aspect-ratio: 1; width: 84px; }
 
-.media-lead { aspect-ratio: 16 / 10; }
+.media-lead { aspect-ratio: 16 / 9; }
 
 .media-img { object-fit: cover; }
 
