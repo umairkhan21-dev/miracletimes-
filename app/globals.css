@@ -425,6 +425,8 @@ html[data-ui-lang="en"] .site-shell:not(.is-lang-ready) {
 
 .media-img { object-fit: cover; }
 
+.media-lead .media-img { object-fit: contain; }
+
 .media-fallback {
   position: absolute;
   inset: 0;

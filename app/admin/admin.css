@@ -1020,6 +1020,10 @@
   aspect-ratio: 16 / 9;
 }
 
+.admin-article-preview .media-lead .media-img {
+  object-fit: contain;
+}
+
 .admin-article-preview .story-body p,
 .admin-article-preview .story-body h2 {
   margin: 0 0 1em;
